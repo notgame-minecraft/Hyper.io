@@ -11,9 +11,10 @@ const PORT = process.env.PORT || 3000;
 const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 1000;
-const PLAYER_SIZE = 8;
+const PLAYER_SIZE = 5;
 const MOVE_SPEED = 2;
 const GRID_SIZE = 10;
+const GAME_DURATION = 90; // 1:30 in seconds
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -26,6 +27,8 @@ app.get('/', (req, res) => {
 // Game state
 const players = new Map();
 const territories = new Set();
+let gameStartTime = Date.now();
+let gameActive = true;
 
 class Player {
   constructor(id, name) {
@@ -61,11 +64,16 @@ class Player {
     this.x = (this.x + GAME_WIDTH) % GAME_WIDTH;
     this.y = (this.y + GAME_HEIGHT) % GAME_HEIGHT;
 
-    // Add to trail
-    this.trail.push({ x: this.x, y: this.y });
+    const currentKey = getKey(this.x, this.y);
+    const inOwnTerritory = this.territory.has(currentKey);
+    
+    // Only add to trail when outside own territory
+    if (!inOwnTerritory && this.trail.length < 500) {
+      this.trail.push({ x: this.x, y: this.y });
+    }
 
     // Keep trail limited
-    if (this.trail.length > 300) {
+    if (this.trail.length > 500) {
       this.trail.shift();
     }
   }
@@ -94,12 +102,11 @@ function pointInPolygon(point, polygon) {
 function captureTerritory(player) {
   if (player.trail.length < 6) return;
   
-  // Check if trail forms a closed loop
-  const start = player.trail[0];
+  // Check if trail connects back to own territory
   const end = player.trail[player.trail.length - 1];
-  const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
+  const endKey = getKey(end.x, end.y);
   
-  if (distToStart > 80) return;
+  if (!player.territory.has(endKey)) return;
   
   // Capture all cells inside the trail
   const capturedCells = new Set();
@@ -108,13 +115,26 @@ function captureTerritory(player) {
       const point = { x: x + GRID_SIZE / 2, y: y + GRID_SIZE / 2 };
       if (pointInPolygon(point, player.trail)) {
         const key = getKey(x, y);
-        if (!player.territory.has(key)) {
-          capturedCells.add(key);
-          player.territory.add(key);
-        }
+        capturedCells.add(key);
       }
     }
   }
+  
+  // Steal territory from other players
+  players.forEach((otherPlayer) => {
+    if (otherPlayer.id !== player.id) {
+      capturedCells.forEach((key) => {
+        if (otherPlayer.territory.has(key)) {
+          otherPlayer.territory.delete(key);
+        }
+      });
+    }
+  });
+  
+  // Add captured cells to player
+  capturedCells.forEach((key) => {
+    player.territory.add(key);
+  });
   
   return capturedCells.size > 0;
 }
@@ -176,8 +196,14 @@ wss.on('connection', (ws) => {
 });
 
 function broadcastGameState() {
+  const elapsed = (Date.now() - gameStartTime) / 1000;
+  const timeRemaining = Math.max(0, GAME_DURATION - elapsed);
+  
   const gameState = {
     type: 'gameState',
+    gameActive,
+    timeRemaining,
+    winner: null,
     players: Array.from(players.values()).map((p) => ({
       id: p.id,
       name: p.name,
@@ -187,9 +213,14 @@ function broadcastGameState() {
       alive: p.alive,
       color: p.color,
       score: Math.floor(p.getTerritoryArea()),
-      territory: Array.from(p.territory), // Convert Set to Array for JSON serialization
+      territory: Array.from(p.territory),
     })),
   };
+  
+  // Determine winner if game is over
+  if (!gameActive && gameState.players.length > 0) {
+    gameState.winner = gameState.players.reduce((a, b) => a.score > b.score ? a : b);
+  }
 
   wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
@@ -199,10 +230,29 @@ function broadcastGameState() {
 }
 
 function updateGame() {
+  // Check if game is over
+  const elapsed = (Date.now() - gameStartTime) / 1000;
+  if (elapsed > GAME_DURATION && gameActive) {
+    gameActive = false;
+    console.log('Game Over!');
+  }
+
   // Update all players
   players.forEach((player) => {
     if (player.alive) {
       player.update();
+    }
+  });
+
+  // Check if player trail closed (auto-capture)
+  players.forEach((player) => {
+    if (player.alive && player.trail.length > 10) {
+      const end = player.trail[player.trail.length - 1];
+      const endKey = getKey(end.x, end.y);
+      if (player.territory.has(endKey)) {
+        captureTerritory(player);
+        player.trail = [];
+      }
     }
   });
 
@@ -215,18 +265,10 @@ function updateGame() {
 
       if (p1.alive && p2.alive && checkCollision(p1, p2)) {
         p1.alive = false;
-        p2.score += 100;
+        p2.territory = new Set([...p2.territory, ...p1.territory]);
       }
     }
   }
-
-  // Update territory
-  players.forEach((player) => {
-    if (player.alive && player.trail.length > 0) {
-      const key = getKey(player.x, player.y);
-      player.territory.add(key);
-    }
-  });
 
   // Broadcast game state
   broadcastGameState();
@@ -253,6 +295,27 @@ setInterval(() => {
 setInterval(() => {
   respawnDeadPlayers();
 }, 5000);
+
+// Reset game every 2 minutes
+setInterval(() => {
+  gameStartTime = Date.now();
+  gameActive = true;
+  players.forEach((player) => {
+    player.trail = [];
+    player.territory = new Set();
+    player.alive = true;
+    player.x = Math.random() * GAME_WIDTH;
+    player.y = Math.random() * GAME_HEIGHT;
+    
+    for (let dx = -GRID_SIZE; dx <= GRID_SIZE; dx += GRID_SIZE) {
+      for (let dy = -GRID_SIZE; dy <= GRID_SIZE; dy += GRID_SIZE) {
+        const key = getKey(player.x + dx, player.y + dy);
+        player.territory.add(key);
+      }
+    }
+  });
+  console.log('Game reset!');
+}, 120000);
 
 server.listen(PORT, HOST, () => {
   const url = process.env.NODE_ENV === 'production' 

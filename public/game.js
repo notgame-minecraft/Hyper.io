@@ -23,6 +23,11 @@ let useKeyboardControl = false;
 let gameStarted = false;
 const GRID_SIZE = 10;
 
+// Game state from server
+let timeRemaining = 90;
+let gameActive = true;
+let winner = null;
+
 // Discord SDK Integration
 let discordSDK = null;
 let isInDiscord = false;
@@ -124,7 +129,13 @@ function connectWebSocket() {
         ...p,
         territory: new Set(p.territory || [])
       }));
-      console.log(`Received gameState with ${players.length} players`);
+      
+      // Update game state from server
+      timeRemaining = data.timeRemaining || 90;
+      gameActive = data.gameActive !== false;
+      winner = data.winner || null;
+      
+      console.log(`Received gameState with ${players.length} players, time: ${Math.floor(timeRemaining)}s`);
       updateLeaderboard();
       
       const currentPlayer = players.find((p) => p.id === playerId);
@@ -298,8 +309,8 @@ function drawGame() {
   const scaleY = canvas.height / gameHeight;
   let scale = Math.min(scaleX, scaleY);
   
-  // Zoom in for better view
-  scale = scale * 0.8;
+  // More zoomed in view
+  scale = scale * 2.0;
 
   const offsetX = canvas.width / 2 - currentPlayer.x * scale;
   const offsetY = canvas.height / 2 - currentPlayer.y * scale;
@@ -312,17 +323,15 @@ function drawGame() {
   ctx.fillStyle = '#E8F5E9';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-  // Draw territory for all players
+  // Draw territory for all players (solid, no transparency)
   players.forEach((player) => {
     ctx.fillStyle = player.color;
-    ctx.globalAlpha = 0.3;
     player.territory.forEach((key) => {
       const [x, y] = key.split(',').map(Number);
       const gridX = x * GRID_SIZE;
       const gridY = y * GRID_SIZE;
       ctx.fillRect(gridX, gridY, GRID_SIZE, GRID_SIZE);
     });
-    ctx.globalAlpha = 1;
   });
 
   // Draw grid for gameplay area
@@ -361,20 +370,23 @@ function drawGame() {
 
     ctx.globalAlpha = 1;
 
-    // Larger, more visible player body
+    // Smaller player body (much more zoomed in now)
     const isCurrentPlayer = player.id === playerId;
-    const playerSize = isCurrentPlayer ? 12 : 8;
+    const playerSize = isCurrentPlayer ? 4 : 3;
 
     if (player.alive) {
+      // Make player color darker than territory
       ctx.fillStyle = player.color;
+      ctx.globalAlpha = 0.7; // Darken by reducing opacity slightly
     } else {
       ctx.fillStyle = '#999';
     }
     ctx.fillRect(player.x - playerSize, player.y - playerSize, playerSize * 2, playerSize * 2);
+    ctx.globalAlpha = 1;
 
-    // Thick border
+    // Border
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3 / scale;
+    ctx.lineWidth = 1 / scale;
     ctx.strokeRect(player.x - playerSize, player.y - playerSize, playerSize * 2, playerSize * 2);
 
     // Draw player name
@@ -398,11 +410,31 @@ function drawGame() {
 
   // Draw HUD
   ctx.fillStyle = '#fff';
-  ctx.font = '14px Arial';
+  ctx.font = 'bold 16px Arial';
   ctx.textAlign = 'left';
+  
+  // Timer
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = Math.floor(timeRemaining % 60);
+  const timeStr = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  ctx.fillText(`⏱ ${timeStr}`, 10, 20);
+  
   if (currentPlayer) {
-    ctx.fillText(`${currentPlayer.name} - ${Math.floor(currentPlayer.score)} pts`, 10, 20);
-    ctx.fillText(`Players: ${players.filter((p) => p.alive).length}/${players.length}`, 10, 40);
+    ctx.font = '14px Arial';
+    ctx.fillText(`${currentPlayer.name} - ${Math.floor(currentPlayer.score)} pts`, 10, 40);
+    ctx.fillText(`Players: ${players.filter((p) => p.alive).length}/${players.length}`, 10, 60);
+  }
+  
+  // Show winner when game ends
+  if (!gameActive && winner) {
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(canvas.width / 2 - 150, canvas.height / 2 - 50, 300, 100);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`🏆 ${winner.name} Wins!`, canvas.width / 2, canvas.height / 2);
+    ctx.font = '16px Arial';
+    ctx.fillText(`Territory: ${Math.floor(winner.score)} pts`, canvas.width / 2, canvas.height / 2 + 30);
   }
 }
 
