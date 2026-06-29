@@ -23,6 +23,48 @@ let useKeyboardControl = false;
 let gameStarted = false;
 const GRID_SIZE = 10;
 
+// Discord SDK Integration
+let discordSDK = null;
+let isInDiscord = false;
+
+async function initializeDiscord() {
+  try {
+    if (!window.DiscordSDK) return;
+    
+    const sdk = window.DiscordSDK;
+    
+    // Authorize the SDK
+    await sdk.ready();
+    
+    const {code} = await sdk.commands.authorize({
+      client_id: "1521223781362827395",
+      response_type: "code",
+      state: "",
+      prompt: "none",
+      scope: ["identify"],
+    });
+
+    const response = await sdk.commands.authenticate({access_token: code});
+    
+    if (response) {
+      discordSDK = sdk;
+      isInDiscord = true;
+      console.log("✅ Discord Activity initialized!");
+      
+      // Listen for user changes
+      sdk.subscribe("READY", (data) => {
+        console.log("Discord ready:", data);
+      });
+    }
+  } catch (err) {
+    console.log("Standalone mode (not in Discord)");
+    isInDiscord = false;
+  }
+}
+
+// Initialize Discord SDK
+initializeDiscord();
+
 // Name screen handlers
 playButton.addEventListener('click', startGame);
 nameInput.addEventListener('keypress', (e) => {
