@@ -256,8 +256,8 @@ function drawGame() {
   const scaleY = canvas.height / gameHeight;
   let scale = Math.min(scaleX, scaleY);
   
-  // Zoom out to see more of the map
-  scale = scale * 0.4;
+  // Zoom in for better view
+  scale = scale * 0.8;
 
   const offsetX = canvas.width / 2 - currentPlayer.x * scale;
   const offsetY = canvas.height / 2 - currentPlayer.y * scale;
@@ -353,18 +353,6 @@ function drawGame() {
   });
 
   ctx.restore();
-
-  // Draw center crosshair to show your position (bigger now that zoomed out)
-  ctx.strokeStyle = '#FF0000';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(canvas.width / 2 - 30, canvas.height / 2);
-  ctx.lineTo(canvas.width / 2 + 30, canvas.height / 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(canvas.width / 2, canvas.height / 2 - 30);
-  ctx.lineTo(canvas.width / 2, canvas.height / 2 + 15);
-  ctx.stroke();
 
   // Draw HUD
   ctx.fillStyle = '#fff';
