@@ -9,61 +9,65 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Game variables
 const MAP_SIZE = 1000;
-const GRID_SIZE = 10;
 let players = {};
 let timeRemaining = 90;
 let gameActive = true;
 let winner = null;
 
-// Colors generator
 const colors = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#009688', '#4CAF50', '#FFEB3B', '#FF9800'];
 
 function getRandomColor() {
     return colors[Math.floor(Math.random() * colors.length)];
 }
 
-// Reset Game state
+// Generate an initial safe circular home territory zone for a new player
+function generateInitialTerritory(centerX, centerY) {
+    let points = [];
+    const radius = 45; // Size of starting base
+    // Create a smooth continuous circular polygon
+    for (let a = 0; a < Math.PI * 2; a += 0.2) {
+        points.push({
+            x: centerX + Math.cos(a) * radius,
+            y: centerY + Math.sin(a) * radius
+        });
+    }
+    return points;
+}
+
 function resetGame() {
     timeRemaining = 90;
     gameActive = true;
     winner = null;
     Object.keys(players).forEach(id => {
         const p = players[id];
-        p.x = Math.floor(Math.random() * (MAP_SIZE - 40)) + 20;
-        p.y = Math.floor(Math.random() * (MAP_SIZE - 40)) + 20;
+        p.x = Math.floor(Math.random() * (MAP_SIZE - 100)) + 50;
+        p.y = Math.floor(Math.random() * (MAP_SIZE - 100)) + 50;
         p.trail = [];
         p.alive = true;
-        p.score = 0;
-        p.territory = [];
-        // Give starting plot
-        const startGX = Math.floor(p.x / GRID_SIZE);
-        const startGY = Math.floor(p.y / GRID_SIZE);
-        for(let dx = -2; dx <= 2; dx++) {
-            for(let dy = -2; dy <= 2; dy++) {
-                p.territory.push(`${startGX + dx},${startGY + dy}`);
-            }
-        }
+        p.score = 100;
+        p.territory = generateInitialTerritory(p.x, p.y);
     });
+}
+
+// Simple check to see if a coordinate point is inside a polygon boundary
+function isPointInPolygon(point, polygon) {
+    let x = point.x, y = point.y;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        let xi = polygon[i].x, yi = polygon[i].y;
+        let xj = polygon[j].x, yj = polygon[j].y;
+        let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
 }
 
 wss.on('connection', (ws) => {
     const playerId = Math.random().toString(36).substr(2, 9);
+    const startX = Math.floor(Math.random() * (MAP_SIZE - 100)) + 50;
+    const startY = Math.floor(Math.random() * (MAP_SIZE - 100)) + 50;
     
-    // Setup starting player values
-    const startX = Math.floor(Math.random() * (MAP_SIZE - 40)) + 20;
-    const startY = Math.floor(Math.random() * (MAP_SIZE - 40)) + 20;
-    const startGX = Math.floor(startX / GRID_SIZE);
-    const startGY = Math.floor(startY / GRID_SIZE);
-    
-    let initialTerritory = [];
-    for(let dx = -2; dx <= 2; dx++) {
-        for(let dy = -2; dy <= 2; dy++) {
-            initialTerritory.push(`${startGX + dx},${startGY + dy}`);
-        }
-    }
-
     players[playerId] = {
         id: playerId,
         name: 'Guest',
@@ -73,9 +77,9 @@ wss.on('connection', (ws) => {
         vy: 0,
         color: getRandomColor(),
         trail: [],
-        territory: initialTerritory,
+        territory: generateInitialTerritory(startX, startY),
         alive: true,
-        score: initialTerritory.length
+        score: 100
     };
 
     ws.send(JSON.stringify({
@@ -100,46 +104,39 @@ wss.on('connection', (ws) => {
         } catch (e) { console.error(e); }
     });
 
-    ws.on('close', () => {
-        delete players[playerId];
-    });
+    ws.on('close', () => { delete players[playerId]; });
 });
 
-// Main physics and rules engine loop
 setInterval(() => {
     if (!gameActive) return;
 
-    // 1. Move players & handle trails
     Object.keys(players).forEach(id => {
         const p = players[id];
         if (!p.alive) return;
 
-        p.x += p.vx * 4; // Speed factor
-        p.y += p.vy * 4;
+        // Apply clean vector movement
+        p.x += p.vx * 4.5;
+        p.y += p.vy * 4.5;
 
-        // Boundaries check
         if (p.x < 0) p.x = 0; if (p.x > MAP_SIZE) p.x = MAP_SIZE;
         if (p.y < 0) p.y = 0; if (p.y > MAP_SIZE) p.y = MAP_SIZE;
 
-        const currentGridKey = `${Math.floor(p.x / GRID_SIZE)},${Math.floor(p.y / GRID_SIZE)}`;
-        const insideOwnTerritory = p.territory.includes(currentGridKey);
+        const currentPos = { x: p.x, y: p.y };
+        const insideOwnTerritory = isPointInPolygon(currentPos, p.territory);
 
         if (!insideOwnTerritory) {
-            // Push trail coordinate points if moving
+            // Leave a continuous smooth path ribbon when out in the wild
             if (p.vx !== 0 || p.vy !== 0) {
                 p.trail.push({ x: p.x, y: p.y });
             }
         } else if (p.trail.length > 0) {
-            // When returning to own plot, fill the trail into territory
-            p.trail.forEach(pt => {
-                const gk = `${Math.floor(pt.x / GRID_SIZE)},${Math.floor(pt.y / GRID_SIZE)}`;
-                if (!p.territory.includes(gk)) p.territory.push(gk);
-            });
+            // Paper.io Fill Logic: Append your trail vertices into your boundary shape
+            p.territory = p.territory.concat(p.trail);
             p.trail = [];
         }
     });
 
-    // 2. Trail Ramming / Hit Elimination Logic
+    // Trail Collision Engine (Paper.io style)
     Object.keys(players).forEach(idA => {
         const pA = players[idA];
         if (!pA.alive) return;
@@ -148,11 +145,14 @@ setInterval(() => {
             const pB = players[idB];
             if (!pB.alive) return;
 
-            // Check if player A rams into Player B's trail
-            pB.trail.forEach(trailPoint => {
+            // Look through player B's trail points
+            pB.trail.forEach((trailPoint, index) => {
+                // Prevent self-killing on immediate trail generation lag
+                if (idA === idB && index > pB.trail.length - 8) return;
+
                 const dist = Math.hypot(pA.x - trailPoint.x, pA.y - trailPoint.y);
-                if (dist < 12) { 
-                    // KILL THE TRAIL OWNER (Player B dies, NOT the rammer Player A)
+                if (dist < 10) { 
+                    // The player whose trail was touched is eliminated!
                     pB.alive = false;
                     pB.trail = [];
                 }
@@ -160,14 +160,13 @@ setInterval(() => {
         });
     });
 
-    // Update scores based on total territory units
+    // Score calculations
     Object.keys(players).forEach(id => {
         const p = players[id];
-        p.score = p.alive ? p.territory.length : 0;
+        p.score = p.alive ? Math.floor(p.territory.length * 2) : 0;
     });
 
-    // Handle timer ticker
-    timeRemaining -= 1 / 20; // Decrement according to loop tick rate
+    timeRemaining -= 1 / 20;
     if (timeRemaining <= 0) {
         gameActive = false;
         let highestScore = -1;
@@ -177,10 +176,9 @@ setInterval(() => {
                 winner = players[id];
             }
         });
-        setTimeout(resetGame, 5000); // Auto-restart match after 5 seconds
+        setTimeout(resetGame, 5000);
     }
 
-    // Distribute Game State payload to all clients
     const payload = JSON.stringify({
         type: 'gameState',
         players: Object.values(players),

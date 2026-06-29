@@ -20,7 +20,6 @@ let ws = null;
 let connected = false;
 let useKeyboardControl = false;
 let gameStarted = false;
-const GRID_SIZE = 10;
 
 let timeRemaining = 90;
 let gameActive = true;
@@ -99,7 +98,7 @@ function connectWebSocket() {
       gameWidth = data.gameWidth;
       gameHeight = data.gameHeight;
     } else if (data.type === 'gameState') {
-      players = data.players.map(p => ({ ...p, territory: new Set(p.territory || []) }));
+      players = data.players;
       timeRemaining = data.timeRemaining || 90;
       gameActive = data.gameActive !== false;
       winner = data.winner || null;
@@ -176,7 +175,7 @@ function drawGame() {
 
   const scaleX = canvas.width / gameWidth;
   const scaleY = canvas.height / gameHeight;
-  let scale = Math.min(scaleX, scaleY) * 2.0;
+  let scale = Math.min(scaleX, scaleY) * 2.2;
 
   const offsetX = canvas.width / 2 - currentPlayer.x * scale;
   const offsetY = canvas.height / 2 - currentPlayer.y * scale;
@@ -185,26 +184,37 @@ function drawGame() {
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  ctx.fillStyle = '#E8F5E9';
+  ctx.fillStyle = '#F5F5F5';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-  // RENDER TERRITORY RADII AS SMOOTH OVERLAPPING CIRCLES (NO SQUARES)
+  // SMOOTH PAPER.IO STYLE POLYGON FILL (NO GRIDS)
   players.forEach((player) => {
+    if (player.territory.length < 3) return;
+    
     ctx.fillStyle = player.color;
-    player.territory.forEach((key) => {
-      const [x, y] = key.split(',').map(Number);
-      const centerX = x * GRID_SIZE + GRID_SIZE / 2;
-      const centerY = y * GRID_SIZE + GRID_SIZE / 2;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, GRID_SIZE / 2 + 1.0, 0, Math.PI * 2);
-      ctx.fill();
-    });
+    ctx.strokeStyle = player.color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    
+    ctx.beginPath();
+    ctx.moveTo(player.territory[0].x, player.territory[0].y);
+    for (let i = 1; i < player.territory.length; i++) {
+        ctx.lineTo(player.territory[i].x, player.territory[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    
+    // Draw slightly darker crisp border accents around paper plots
+    ctx.globalAlpha = 0.2;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
   });
 
-  // Trails and players
+  // Solid thick trail ribbons
   players.forEach((player) => {
     ctx.strokeStyle = player.color;
-    ctx.lineWidth = 14; 
+    ctx.lineWidth = 12; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -218,10 +228,10 @@ function drawGame() {
     }
 
     if (player.alive) {
-      // CIRCULAR PLAYER AVATAR
+      // Smooth Circular Head Player Body
       ctx.fillStyle = player.color;
       ctx.beginPath();
-      ctx.arc(player.x, player.y, 7, 0, Math.PI * 2);
+      ctx.arc(player.x, player.y, 8, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1.5;
@@ -230,20 +240,20 @@ function drawGame() {
       ctx.fillStyle = '#000';
       ctx.font = `bold ${14 / scale}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(player.name, player.x, player.y - 14);
+      ctx.fillText(player.name, player.x, player.y - 15);
       
       if (player.id === playerId) {
         ctx.fillStyle = '#FF0000';
         ctx.font = `bold ${10 / scale}px Arial`;
-        ctx.fillText('YOU', player.x, player.y + 18);
+        ctx.fillText('YOU', player.x, player.y + 20);
       }
     }
   });
 
   ctx.restore();
 
-  // HIGH-VISIBILITY DISCORD HUD BACKING BOX
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+  // Discord HUD Visibility Backing Shape
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   ctx.fillRect(10, 10, 210, 85);
 
   ctx.fillStyle = '#fff';
