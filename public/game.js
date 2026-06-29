@@ -149,9 +149,17 @@ function updateLeaderboard() {
 
 // Drawing
 function drawGame() {
-  // Clear canvas
-  ctx.fillStyle = '#0a0a0a';
+  // Draw outside background
+  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  gradient.addColorStop(0, '#87CEEB'); // Sky blue
+  gradient.addColorStop(0.7, '#87CEEB');
+  gradient.addColorStop(1, '#90EE90'); // Grass green
+  ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw grass ground
+  ctx.fillStyle = '#7CB342';
+  ctx.fillRect(0, canvas.height * 0.65, canvas.width, canvas.height * 0.35);
 
   if (!playerId) return;
 
@@ -171,8 +179,12 @@ function drawGame() {
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  // Draw grid (optional)
-  ctx.strokeStyle = '#1a1a1a';
+  // Draw game area background
+  ctx.fillStyle = '#E8F5E9';
+  ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+  // Draw grid for gameplay area
+  ctx.strokeStyle = '#C8E6C9';
   ctx.lineWidth = 1 / scale;
   for (let x = 0; x < gameWidth; x += 100) {
     ctx.beginPath();
@@ -189,11 +201,12 @@ function drawGame() {
 
   // Draw all players
   players.forEach((player) => {
-    // Draw trail
+    // Draw trail (thicker)
     ctx.strokeStyle = player.color;
-    ctx.lineWidth = 2 / scale;
+    ctx.lineWidth = 6 / scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
+    ctx.globalAlpha = 0.8;
 
     if (player.trail.length > 1) {
       ctx.beginPath();
@@ -204,21 +217,28 @@ function drawGame() {
       ctx.stroke();
     }
 
-    // Draw player body
+    ctx.globalAlpha = 1;
+
+    // Draw player body as a block
     if (player.alive) {
       ctx.fillStyle = player.color;
     } else {
-      ctx.fillStyle = '#444';
+      ctx.fillStyle = '#999';
     }
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, 8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(player.x - 8, player.y - 8, 16, 16);
+
+    // Draw block outline
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1 / scale;
+    ctx.strokeRect(player.x - 8, player.y - 8, 16, 16);
 
     // Draw player name
-    ctx.fillStyle = '#fff';
-    ctx.font = `${12 / scale}px Arial`;
+    ctx.fillStyle = '#000';
+    ctx.font = `bold ${12 / scale}px Arial`;
     ctx.textAlign = 'center';
-    ctx.fillText(player.name, player.x, player.y - 20 / scale);
+    ctx.globalAlpha = 0.9;
+    ctx.fillText(player.name, player.x, player.y - 25 / scale);
+    ctx.globalAlpha = 1;
   });
 
   ctx.restore();
