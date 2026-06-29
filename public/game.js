@@ -25,35 +25,34 @@ let timeRemaining = 90;
 let gameActive = true;
 let winner = null;
 
-let discordSDK = null;
-let isInDiscord = false;
-
-async function initializeDiscord() {
+// Clean Discord Activity Handshake
+async function setupDiscordActivity() {
+  if (typeof DiscordSDK === 'undefined') {
+    console.log("Running in standard browser environment.");
+    return;
+  }
   try {
-    if (!window.DiscordSDK) return;
-    const sdk = window.DiscordSDK;
-    await sdk.ready();
-    const {code} = await sdk.commands.authorize({
+    const discordSdk = new DiscordSDK({ clientId: "1521223781362827395" });
+    await discordSdk.ready();
+    const auth = await discordSdk.commands.authorize({
       client_id: "1521223781362827395",
       response_type: "code",
       state: "",
       prompt: "none",
       scope: ["identify"],
     });
-    const response = await sdk.commands.authenticate({access_token: code});
-    if (response) {
-      discordSDK = sdk;
-      isInDiscord = true;
-      console.log("✅ Discord Activity initialized!");
-      sdk.subscribe("READY", (data) => { console.log("Discord ready:", data); });
+    
+    if (auth) {
+      await discordSdk.commands.authenticate({ access_token: auth.code });
+      console.log("Discord Embedded Activity authorization complete!");
     }
-  } catch (err) {
-    console.log("Standalone mode (not in Discord)");
-    isInDiscord = false;
+  } catch (error) {
+    console.error("Discord SDK initialization skipped or failed:", error);
   }
 }
 
-initializeDiscord();
+// Fire setup right away
+setupDiscordActivity();
 
 playButton.addEventListener('click', startGame);
 nameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') startGame(); });
@@ -136,8 +135,10 @@ function updatePlayer() {
   let vx = 0; let vy = 0;
 
   if (useKeyboardControl) {
-    if (keys['w']) vy -= 1; if (keys['s']) vy += 1;
-    if (keys['a']) vx -= 1; if (keys['d']) vx += 1;
+    if (keys['w'] || keys['arrowup']) vy -= 1;
+    if (keys['s'] || keys['arrowdown']) vy += 1;
+    if (keys['a'] || keys['arrowleft']) vx -= 1;
+    if (keys['d'] || keys['arrowright']) vx += 1;
   } else {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
@@ -156,17 +157,13 @@ function updateLeaderboard() {
   leaderboardDiv.innerHTML = sorted.map((p, i) => {
     return `<div class="${p.id === playerId ? 'player-info you' : 'player-info'}">
       <div class="player-name">${i + 1}. ${p.name} ${p.alive ? '✓' : '✗'}</div>
-      <div class="player-score">${Math.floor(p.score)} points</div>
+      <div class="player-score">${Math.floor(p.score)} pts</div>
     </div>`;
   }).join('');
 }
 
 function drawGame() {
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#87CEEB');
-  gradient.addColorStop(0.7, '#87CEEB');
-  gradient.addColorStop(1, '#90EE90');
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = '#87CEEB';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   if (!playerId || players.length === 0) return;
@@ -184,18 +181,14 @@ function drawGame() {
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  ctx.fillStyle = '#F5F5F5';
+  ctx.fillStyle = '#EAEAEA';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-  // SMOOTH PAPER.IO STYLE POLYGON FILL (NO GRIDS)
+  // Draw smooth paper fills
   players.forEach((player) => {
     if (player.territory.length < 3) return;
     
     ctx.fillStyle = player.color;
-    ctx.strokeStyle = player.color;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    
     ctx.beginPath();
     ctx.moveTo(player.territory[0].x, player.territory[0].y);
     for (let i = 1; i < player.territory.length; i++) {
@@ -204,17 +197,17 @@ function drawGame() {
     ctx.closePath();
     ctx.fill();
     
-    // Draw slightly darker crisp border accents around paper plots
-    ctx.globalAlpha = 0.2;
-    ctx.strokeStyle = '#000';
+    ctx.globalAlpha = 0.15;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
     ctx.stroke();
     ctx.globalAlpha = 1.0;
   });
 
-  // Solid thick trail ribbons
+  // Render active trailing line ribbons
   players.forEach((player) => {
     ctx.strokeStyle = player.color;
-    ctx.lineWidth = 12; 
+    ctx.lineWidth = 10; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -228,52 +221,51 @@ function drawGame() {
     }
 
     if (player.alive) {
-      // Smooth Circular Head Player Body
       ctx.fillStyle = player.color;
       ctx.beginPath();
-      ctx.arc(player.x, player.y, 8, 0, Math.PI * 2);
+      ctx.arc(player.x, player.y, 9, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 2;
       ctx.stroke();
 
-      ctx.fillStyle = '#000';
-      ctx.font = `bold ${14 / scale}px Arial`;
+      ctx.fillStyle = '#111111';
+      ctx.font = `bold ${13 / scale}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillText(player.name, player.x, player.y - 15);
+      ctx.fillText(player.name, player.x, player.y - 16);
       
       if (player.id === playerId) {
-        ctx.fillStyle = '#FF0000';
-        ctx.font = `bold ${10 / scale}px Arial`;
-        ctx.fillText('YOU', player.x, player.y + 20);
+        ctx.fillStyle = '#FF3B30';
+        ctx.font = `bold ${10 / scale}px sans-serif`;
+        ctx.fillText('YOU', player.x, player.y + 22);
       }
     }
   });
 
   ctx.restore();
 
-  // Discord HUD Visibility Backing Shape
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(10, 10, 210, 85);
+  // Clear HUD text box setup
+  ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
+  ctx.fillRect(15, 15, 200, 85);
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 16px Arial';
+  ctx.fillStyle = '#FFF';
+  ctx.font = 'bold 15px sans-serif';
   ctx.textAlign = 'left';
   
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = Math.floor(timeRemaining % 60);
-  ctx.fillText(`⏱ Timer: ${minutes}:${seconds.toString().padStart(2, '0')}`, 25, 35);
-  ctx.font = '14px Arial';
-  ctx.fillText(`Score: ${Math.floor(currentPlayer.score)} pts`, 25, 55);
-  ctx.fillText(`Alive: ${players.filter(p => p.alive).length}/${players.length}`, 25, 75);
+  ctx.fillText(`⏱ Time: ${minutes}:${seconds.toString().padStart(2, '0')}`, 30, 40);
+  ctx.font = '14px sans-serif';
+  ctx.fillText(`Score: ${Math.floor(currentPlayer.score)} pts`, 30, 62);
+  ctx.fillText(`Players: ${players.filter(p => p.alive).length}`, 30, 82);
 
   if (!gameActive && winner) {
-    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.fillRect(canvas.width / 2 - 150, canvas.height / 2 - 50, 300, 100);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(`🏆 ${winner.name} Wins!`, canvas.width / 2, canvas.height / 2);
+    ctx.fillText(`🏆 Winner: ${winner.name}`, canvas.width / 2, canvas.height / 2);
   }
 }
 
