@@ -1,277 +1,65 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hyper.io - Multiplayer Territory Game</title>
-  <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@latest/dist/discord-embedded-app.umd.js"></script>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-      background: #1a1a1a;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      overflow: hidden;
-    }
-
-    .name-screen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-
-    .name-screen-content {
-      text-align: center;
-      background: #222;
-      padding: 40px;
-      border-radius: 15px;
-      border: 2px solid #4ade80;
-      box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
-    }
-
-    .name-screen h1 {
-      font-size: 48px;
-      color: #4ade80;
-      margin-bottom: 20px;
-      text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
-    }
-
-    .name-screen p {
-      font-size: 18px;
-      color: #aaa;
-      margin-bottom: 20px;
-    }
-
-    .name-screen input {
-      width: 250px;
-      padding: 12px;
-      font-size: 16px;
-      border: 2px solid #4ade80;
-      border-radius: 8px;
-      background: #1a1a1a;
-      color: #fff;
-      margin-bottom: 20px;
-      outline: none;
-    }
-
-    .name-screen input:focus {
-      border-color: #fbbf24;
-      box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
-    }
-
-    .name-screen button {
-      padding: 12px 30px;
-      font-size: 18px;
-      font-weight: bold;
-      background: #4ade80;
-      color: #1a1a1a;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .name-screen button:hover {
-      background: #22c55e;
-      transform: scale(1.05);
-      box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
-    }
-
-    .container {
-      position: relative;
-      display: flex;
-      gap: 20px;
-      width: 100%;
-      height: 100vh;
-      padding: 10px;
-    }
-
-    #gameCanvas {
-      border: 2px solid #333;
-      background: #0a0a0a;
-      cursor: crosshair;
-      flex: 1;
-      max-width: 1000px;
-      image-rendering: pixelated;
-    }
-
-    .sidebar {
-      width: 250px;
-      background: #222;
-      border-radius: 10px;
-      padding: 15px;
-      display: flex;
-      flex-direction: column;
-      gap: 15px;
-      overflow-y: auto;
-      border: 1px solid #444;
-    }
-
-    .sidebar h2 {
-      color: #4ade80;
-      font-size: 18px;
-      border-bottom: 2px solid #4ade80;
-      padding-bottom: 10px;
-    }
-
-    .player-info {
-      background: #1a1a1a;
-      padding: 10px;
-      border-radius: 5px;
-      border-left: 4px solid #4ade80;
-    }
-
-    .player-info.you {
-      border-left-color: #fbbf24;
-      background: #2a2400;
-    }
-
-    .player-name {
-      font-weight: bold;
-      color: #fff;
-      font-size: 14px;
-    }
-
-    .player-score {
-      color: #888;
-      font-size: 12px;
-      margin-top: 5px;
-    }
-
-    .controls {
-      background: #1a1a1a;
-      padding: 15px;
-      border-radius: 5px;
-      border: 1px solid #444;
-    }
-
-    .controls h3 {
-      font-size: 14px;
-      margin-bottom: 10px;
-      color: #888;
-    }
-
-    .controls p {
-      font-size: 12px;
-      color: #666;
-      margin: 5px 0;
-    }
-
-    .instructions {
-      background: #1a1a1a;
-      padding: 15px;
-      border-radius: 5px;
-      border: 1px solid #444;
-    }
-
-    .instructions h3 {
-      font-size: 14px;
-      margin-bottom: 10px;
-      color: #888;
-    }
-
-    .instructions p {
-      font-size: 12px;
-      color: #666;
-      margin: 5px 0;
-      line-height: 1.4;
-    }
-
-    .connection-status {
-      text-align: center;
-      padding: 10px;
-      border-radius: 5px;
-      font-size: 12px;
-      background: #0a0a0a;
-      border: 1px solid #444;
-    }
-
-    .connection-status.connected {
-      color: #4ade80;
-      border-color: #4ade80;
-    }
-
-    .connection-status.disconnected {
-      color: #ef4444;
-      border-color: #ef4444;
-    }
-
-    @media (max-width: 1200px) {
-      .container {
-        flex-direction: column;
-      }
-
-      #gameCanvas {
-        max-width: 100%;
-        height: 60vh;
-      }
-
-      .sidebar {
-        width: 100%;
-        max-height: 200px;
-        flex-direction: row;
-        gap: 10px;
-        overflow-x: auto;
-      }
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hyper.io</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #1a1a1a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; color: #fff; }
+        #nameScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: radial-gradient(circle, #2c3e50, #0f171e); }
+        #nameScreen h1 { font-size: 48px; margin-bottom: 20px; letter-spacing: 2px; text-transform: uppercase; color: #00bcd4; text-shadow: 0 0 10px rgba(0,188,212,0.5); }
+        #nameInput { padding: 12px 20px; font-size: 18px; border: 2px solid #00bcd4; background: rgba(0,0,0,0.5); color: #fff; border-radius: 25px; outline: none; width: 250px; text-align: center; margin-bottom: 20px; transition: 0.3s; }
+        #nameInput:focus { box-shadow: 0 0 15px #00bcd4; }
+        #playButton { padding: 12px 40px; font-size: 18px; background: #00bcd4; border: none; color: #fff; border-radius: 25px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; }
+        #playButton:hover { background: #00acc1; transform: scale(1.05); box-shadow: 0 0 15px rgba(0,188,212,0.4); }
+        
+        #gameContainer { display: none; width: 100%; height: 100%; position: relative; }
+        #gameCanvas { background: #f0f0f0; display: block; box-shadow: 0 0 20px rgba(0,0,0,0.8); margin: auto; }
+        
+        #uiLayer { position: absolute; top: 20px; right: 20px; width: 240px; background: rgba(20,20,20,0.85); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(5px); pointer-events: none; }
+        #leaderboard h3 { margin: 0 0 10px 0; color: #00bcd4; font-size: 16px; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+        .player-info { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; opacity: 0.8; }
+        .player-info.you { color: #00bcd4; font-weight: bold; opacity: 1; }
+        
+        /* MODERN GAME OVER OVERLAY */
+        #gameOverScreen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 20, 0.9); flex-direction: column; align-items: center; justify-content: center; z-index: 10; backdrop-filter: blur(8px); }
+        #gameOverScreen h2 { font-size: 42px; color: #ff3b30; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        #gameOverScreen p { font-size: 18px; color: #a0aab0; margin-bottom: 30px; }
+        .menu-btn { padding: 12px 35px; font-size: 16px; font-weight: bold; text-transform: uppercase; border: none; border-radius: 25px; cursor: pointer; margin: 10px; width: 200px; transition: 0.2s; }
+        .respawn-btn { background: #4caf50; color: #fff; }
+        .respawn-btn:hover { background: #45a049; transform: scale(1.03); }
+        .mainmenu-btn { background: rgba(255,255,255,0.1); color: #fff; border: 1px solid rgba(255,255,255,0.2); }
+        .mainmenu-btn:hover { background: rgba(255,255,255,0.2); transform: scale(1.03); }
+    </style>
+    <!-- Discord SDK Client Asset API Hooks -->
+    <script src="https://gamedistribution.com/html5-sdk/js"></script>
 </head>
 <body>
-  <div id="nameScreen" class="name-screen">
-    <div class="name-screen-content">
-      <h1>Hyper.io</h1>
-      <p>Enter your username</p>
-      <input type="text" id="nameInput" placeholder="Your name" maxlength="20" />
-      <button id="playButton">PLAY</button>
-    </div>
-  </div>
 
-  <div id="gameContainer" class="container" style="display: none;">
-    <canvas id="gameCanvas"></canvas>
-    <div class="sidebar">
-      <div>
-        <div class="connection-status disconnected" id="status">
-          Connecting...
+    <div id="nameScreen">
+        <h1>Hyper.io</h1>
+        <input type="text" id="nameInput" placeholder="Enter Nickname" maxlength="14">
+        <button id="playButton">Enter Arena</button>
+    </div>
+
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="uiLayer">
+            <div id="leaderboard">
+                <h3>Leaderboard</h3>
+                <div id="playersList"></div>
+            </div>
         </div>
-      </div>
-
-      <div class="controls">
-        <h3>CONTROLS</h3>
-        <p><strong>Mouse/Touch:</strong> Move to aim</p>
-        <p><strong>WASD:</strong> Alternative movement</p>
-      </div>
-
-      <div>
-        <h2>LEADERBOARD</h2>
-        <div id="leaderboard"></div>
-      </div>
-
-      <div class="instructions">
-        <h3>HOW TO PLAY</h3>
-        <p>🎮 Capture territory by drawing lines</p>
-        <p>💥 Avoid colliding with other players</p>
-        <p>📊 Gain points by controlling area</p>
-        <p>🏆 Be the last player standing!</p>
-      </div>
+        
+        <!-- UI Screen Dialog Layer -->
+        <div id="gameOverScreen">
+            <h2>Wasted</h2>
+            <p id="finalScore">Your Score: 0 pts</p>
+            <button class="menu-btn respawn-btn" id="respawnBtn">Respawn</button>
+            <button class="menu-btn mainmenu-btn" id="mainMenuBtn">Main Menu</button>
+        </div>
     </div>
-  </div>
 
-  <script src="game.js"></script>
+    <script src="game.js"></script>
 </body>
 </html>
