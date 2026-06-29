@@ -17,6 +17,11 @@ const MOVE_SPEED = 5;
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Game state
 const players = new Map();
 const territories = new Set();
