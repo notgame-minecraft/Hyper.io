@@ -1,3 +1,7 @@
+const nameScreen = document.getElementById('nameScreen');
+const nameInput = document.getElementById('nameInput');
+const playButton = document.getElementById('playButton');
+const gameContainer = document.getElementById('gameContainer');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const leaderboardDiv = document.getElementById('leaderboard');
@@ -11,14 +15,71 @@ let playerName = null;
 let players = [];
 let mouseX = 0;
 let mouseY = 0;
+let lastMouseX = 0;
+let lastMouseY = 0;
 let ws = null;
 let connected = false;
+let useKeyboardControl = false;
+let gameStarted = false;
+const GRID_SIZE = 10;
 
-// Resize canvas
+// Game state from server
+let timeRemaining = 90;
+let gameActive = true;
+let winner = null;
+
+// Discord SDK Integration
+let discordSDK = null;
+let isInDiscord = false;
+
+async function initializeDiscord() {
+  try {
+    if (!window.DiscordSDK) return;
+    const sdk = window.DiscordSDK;
+    await sdk.ready();
+    const {code} = await sdk.commands.authorize({
+      client_id: "1521223781362827395",
+      response_type: "code",
+      state: "",
+      prompt: "none",
+      scope: ["identify"],
+    });
+    const response = await sdk.commands.authenticate({access_token: code});
+    if (response) {
+      discordSDK = sdk;
+      isInDiscord = true;
+      console.log("✅ Discord Activity initialized!");
+      sdk.subscribe("READY", (data) => {
+        console.log("Discord ready:", data);
+      });
+    }
+  } catch (err) {
+    console.log("Standalone mode (not in Discord)");
+    isInDiscord = false;
+  }
+}
+
+initializeDiscord();
+
+playButton.addEventListener('click', startGame);
+nameInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') startGame();
+});
+
+function startGame() {
+  const name = nameInput.value.trim() || `Player${Math.floor(Math.random() * 10000)}`;
+  playerName = name;
+  nameScreen.style.display = 'none';
+  gameContainer.style.display = 'flex';
+  gameStarted = true;
+  connectWebSocket();
+}
+
+nameInput.focus();
+
 function resizeCanvas() {
   const maxWidth = Math.min(window.innerWidth - 270, 1000);
   const maxHeight = Math.min(window.innerHeight - 40, 1000);
-
   canvas.width = maxWidth;
   canvas.height = maxHeight;
 }
@@ -26,7 +87,6 @@ function resizeCanvas() {
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
-// WebSocket connection
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${protocol}//${window.location.host}`);
@@ -35,179 +95,138 @@ function connectWebSocket() {
     connected = true;
     statusDiv.textContent = '● Connected';
     statusDiv.className = 'connection-status connected';
-    console.log('Connected to server');
+    if (ws && connected) {
+      ws.send(JSON.stringify({ type: 'setName', name: playerName }));
+    }
   };
 
   ws.onmessage = (event) => {
     const data = JSON.parse(event.data);
-
     if (data.type === 'init') {
       playerId = data.playerId;
-      playerName = data.playerName;
       gameWidth = data.gameWidth;
       gameHeight = data.gameHeight;
-      console.log(`Initialized as ${playerName} (${playerId})`);
     } else if (data.type === 'gameState') {
-      players = data.players;
+      players = data.players.map(p => ({
+        ...p,
+        territory: new Set(p.territory || [])
+      }));
+      timeRemaining = data.timeRemaining || 90;
+      gameActive = data.gameActive !== false;
+      winner = data.winner || null;
       updateLeaderboard();
     }
-  };
-
-  ws.onerror = (error) => {
-    console.error('WebSocket error:', error);
   };
 
   ws.onclose = () => {
     connected = false;
     statusDiv.textContent = '● Disconnected';
     statusDiv.className = 'connection-status disconnected';
-    console.log('Disconnected from server');
     setTimeout(() => connectWebSocket(), 2000);
   };
 }
 
-// Input handling
 document.addEventListener('mousemove', (e) => {
-  mouseX = e.clientX;
-  mouseY = e.clientY;
-});
-
-document.addEventListener('touchmove', (e) => {
-  if (e.touches.length > 0) {
-    mouseX = e.touches[0].clientX;
-    mouseY = e.touches[0].clientY;
+  const newMouseX = e.clientX;
+  const newMouseY = e.clientY;
+  if (Math.hypot(newMouseX - lastMouseX, newMouseY - lastMouseY) > 5) {
+    useKeyboardControl = false;
   }
-  e.preventDefault();
+  mouseX = newMouseX;
+  mouseY = newMouseY;
+  lastMouseX = newMouseX;
+  lastMouseY = newMouseY;
 });
 
 const keys = {};
 document.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
+  const key = e.key.toLowerCase();
+  keys[key] = true;
+  if (['w', 'a', 's', 'd'].includes(key)) useKeyboardControl = true;
 });
+document.addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
 
-document.addEventListener('keyup', (e) => {
-  keys[e.key.toLowerCase()] = false;
-});
-
-// Game update
 function updatePlayer() {
   if (!connected) return;
-
   const rect = canvas.getBoundingClientRect();
-  let vx = 0;
-  let vy = 0;
+  let vx = 0; let vy = 0;
 
-  // Mouse/touch input
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const dx = mouseX - centerX;
-  const dy = mouseY - centerY;
-  const dist = Math.hypot(dx, dy);
-
-  if (dist > 10) {
-    vx += dx / dist;
-    vy += dy / dist;
+  if (useKeyboardControl) {
+    if (keys['w']) vy -= 1;
+    if (keys['s']) vy += 1;
+    if (keys['a']) vx -= 1;
+    if (keys['d']) vx += 1;
+  } else {
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = mouseX - centerX;
+    const dy = mouseY - centerY;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 10) { vx = dx / dist; vy = dy / dist; }
   }
 
-  // Keyboard input
-  if (keys['w']) vy -= 1;
-  if (keys['s']) vy += 1;
-  if (keys['a']) vx -= 1;
-  if (keys['d']) vx += 1;
-
-  // Normalize
   const mag = Math.hypot(vx, vy);
-  if (mag > 0) {
-    vx /= mag;
-    vy /= mag;
-  }
-
-  // Send movement to server
-  if (ws && connected) {
-    ws.send(JSON.stringify({ type: 'move', vx, vy }));
-  }
+  if (mag > 0) { vx /= mag; vy /= mag; }
+  if (ws && connected) { ws.send(JSON.stringify({ type: 'move', vx, vy })); }
 }
 
 function updateLeaderboard() {
   const sorted = [...players].sort((a, b) => b.score - a.score).slice(0, 10);
-
-  leaderboardDiv.innerHTML = sorted
-    .map((p, i) => {
-      const isYou = p.id === playerId;
-      const statusClass = isYou ? 'player-info you' : 'player-info';
-      const status = p.alive ? '✓' : '✗';
-
-      return `
-        <div class="${statusClass}">
-          <div class="player-name">${i + 1}. ${p.name} ${status}</div>
-          <div class="player-score">${Math.floor(p.score)} points</div>
-        </div>
-      `;
-    })
-    .join('');
+  leaderboardDiv.innerHTML = sorted.map((p, i) => {
+    return `<div class="${p.id === playerId ? 'player-info you' : 'player-info'}">
+      <div class="player-name">${i + 1}. ${p.name} ${p.alive ? '✓' : '✗'}</div>
+      <div class="player-score">${Math.floor(p.score)} points</div>
+    </div>`;
+  }).join('');
 }
 
-// Drawing
 function drawGame() {
-  // Draw outside background
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#87CEEB'); // Sky blue
+  gradient.addColorStop(0, '#87CEEB');
   gradient.addColorStop(0.7, '#87CEEB');
-  gradient.addColorStop(1, '#90EE90'); // Grass green
+  gradient.addColorStop(1, '#90EE90');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw grass ground
-  ctx.fillStyle = '#7CB342';
-  ctx.fillRect(0, canvas.height * 0.65, canvas.width, canvas.height * 0.35);
-
-  if (!playerId) return;
-
-  // Find current player
+  if (!playerId || players.length === 0) return;
   const currentPlayer = players.find((p) => p.id === playerId);
   if (!currentPlayer) return;
 
-  // Calculate scale and offset to center on current player
   const scaleX = canvas.width / gameWidth;
   const scaleY = canvas.height / gameHeight;
-  const scale = Math.min(scaleX, scaleY);
+  let scale = Math.min(scaleX, scaleY) * 2.0;
 
-  const offsetX = (canvas.width - gameWidth * scale) / 2 - currentPlayer.x * scale;
-  const offsetY = (canvas.height - gameHeight * scale) / 2 - currentPlayer.y * scale;
+  const offsetX = canvas.width / 2 - currentPlayer.x * scale;
+  const offsetY = canvas.height / 2 - currentPlayer.y * scale;
 
   ctx.save();
   ctx.translate(offsetX, offsetY);
   ctx.scale(scale, scale);
 
-  // Draw game area background
   ctx.fillStyle = '#E8F5E9';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-  // Draw grid for gameplay area
-  ctx.strokeStyle = '#C8E6C9';
-  ctx.lineWidth = 1 / scale;
-  for (let x = 0; x < gameWidth; x += 100) {
-    ctx.beginPath();
-    ctx.lineTo(x, 0);
-    ctx.lineTo(x, gameHeight);
-    ctx.stroke();
-  }
-  for (let y = 0; y < gameHeight; y += 100) {
-    ctx.beginPath();
-    ctx.lineTo(0, y);
-    ctx.lineTo(gameWidth, y);
-    ctx.stroke();
-  }
-
-  // Draw all players
+  // DRAW TERRITORIES AS CIRCLES INSTEAD OF SQUARES
   players.forEach((player) => {
-    // Draw trail (thicker)
+    ctx.fillStyle = player.color;
+    player.territory.forEach((key) => {
+      const [x, y] = key.split(',').map(Number);
+      const centerX = x * GRID_SIZE + GRID_SIZE / 2;
+      const centerY = y * GRID_SIZE + GRID_SIZE / 2;
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, GRID_SIZE / 2 + 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  });
+
+  // Trails and players
+  players.forEach((player) => {
+    // Solid ribbon trail
     ctx.strokeStyle = player.color;
-    ctx.lineWidth = 6 / scale;
+    ctx.lineWidth = 12;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.globalAlpha = 0.8;
-
+    
     if (player.trail.length > 1) {
       ctx.beginPath();
       ctx.moveTo(player.trail[0].x, player.trail[0].y);
@@ -217,49 +236,59 @@ function drawGame() {
       ctx.stroke();
     }
 
-    ctx.globalAlpha = 1;
-
-    // Draw player body as a block
     if (player.alive) {
+      // CIRCULAR PLAYER BODY
       ctx.fillStyle = player.color;
-    } else {
-      ctx.fillStyle = '#999';
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#000';
+      ctx.font = `bold ${14 / scale}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.fillText(player.name, player.x, player.y - 12);
+      
+      if (player.id === playerId) {
+        ctx.fillStyle = '#FF0000';
+        ctx.font = `bold ${10 / scale}px Arial`;
+        ctx.fillText('YOU', player.x, player.y + 16);
+      }
     }
-    ctx.fillRect(player.x - 8, player.y - 8, 16, 16);
-
-    // Draw block outline
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.lineWidth = 1 / scale;
-    ctx.strokeRect(player.x - 8, player.y - 8, 16, 16);
-
-    // Draw player name
-    ctx.fillStyle = '#000';
-    ctx.font = `bold ${12 / scale}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.globalAlpha = 0.9;
-    ctx.fillText(player.name, player.x, player.y - 25 / scale);
-    ctx.globalAlpha = 1;
   });
 
   ctx.restore();
 
-  // Draw HUD
+  // DARK HUD BOX FOR VISIBILITY ON DISCORD
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(10, 10, 200, 80);
+
   ctx.fillStyle = '#fff';
-  ctx.font = '14px Arial';
+  ctx.font = 'bold 16px Arial';
   ctx.textAlign = 'left';
-  if (currentPlayer) {
-    ctx.fillText(`${currentPlayer.name} - ${Math.floor(currentPlayer.score)} pts`, 10, 20);
-    ctx.fillText(`Players: ${players.filter((p) => p.alive).length}/${players.length}`, 10, 40);
+  
+  const minutes = Math.floor(timeRemaining / 60);
+  const seconds = Math.floor(timeRemaining % 60);
+  ctx.fillText(`⏱ Timer: ${minutes}:${seconds.toString().padStart(2, '0')}`, 20, 35);
+  ctx.font = '14px Arial';
+  ctx.fillText(`Score: ${Math.floor(currentPlayer.score)} pts`, 20, 55);
+  ctx.fillText(`Alive: ${players.filter(p => p.alive).length}/${players.length}`, 20, 75);
+
+  if (!gameActive && winner) {
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(canvas.width / 2 - 150, canvas.height / 2 - 50, 300, 100);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(`🏆 ${winner.name} Wins!`, canvas.width / 2, canvas.height / 2);
   }
 }
 
-// Game loop
 function gameLoop() {
   updatePlayer();
   drawGame();
   requestAnimationFrame(gameLoop);
 }
-
-// Start
-connectWebSocket();
 gameLoop();
