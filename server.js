@@ -40,11 +40,10 @@ class Player {
     this.alive = true;
     this.score = 0;
     this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
-    this.inTrail = true; // True when outside territory, False when returning
     
-    // Create initial 3x3 territory
-    for (let dx = -15; dx <= 15; dx += GRID_SIZE) {
-      for (let dy = -15; dy <= 15; dy += GRID_SIZE) {
+    // Create initial 3x3 territory around spawn point
+    for (let dx = -GRID_SIZE; dx <= GRID_SIZE; dx += GRID_SIZE) {
+      for (let dy = -GRID_SIZE; dy <= GRID_SIZE; dy += GRID_SIZE) {
         const key = getKey(this.x + dx, this.y + dy);
         this.territory.add(key);
       }
@@ -93,14 +92,14 @@ function pointInPolygon(point, polygon) {
 }
 
 function captureTerritory(player) {
-  if (player.trail.length < 6) return; // Need at least a triangle
+  if (player.trail.length < 6) return;
   
-  // Check if trail forms a closed loop (player returned to starting area)
+  // Check if trail forms a closed loop
   const start = player.trail[0];
   const end = player.trail[player.trail.length - 1];
   const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
   
-  if (distToStart > 50) return; // Not closed enough
+  if (distToStart > 80) return;
   
   // Capture all cells inside the trail
   const capturedCells = new Set();
@@ -118,6 +117,11 @@ function captureTerritory(player) {
   }
   
   return capturedCells.size > 0;
+}
+
+function isPlayerInOwnTerritory(player) {
+  const key = getKey(player.x, player.y);
+  return player.territory.has(key);
 }
 
 function checkCollision(p1, p2) {

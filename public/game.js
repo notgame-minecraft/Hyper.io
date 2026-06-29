@@ -108,7 +108,7 @@ function checkCaptureOpportunity() {
   const end = currentPlayer.trail[currentPlayer.trail.length - 1];
   const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
 
-  if (distToStart < 50) {
+  if (distToStart < 80) {
     if (ws && connected) {
       ws.send(JSON.stringify({ type: 'captureCheck' }));
     }
@@ -251,6 +251,19 @@ function drawGame() {
   // Draw game area background
   ctx.fillStyle = '#E8F5E9';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
+
+  // Draw territory for all players
+  players.forEach((player) => {
+    ctx.fillStyle = player.color;
+    ctx.globalAlpha = 0.3;
+    player.territory.forEach((key) => {
+      const [x, y] = key.split(',').map(Number);
+      const gridX = x * GRID_SIZE;
+      const gridY = y * GRID_SIZE;
+      ctx.fillRect(gridX, gridY, GRID_SIZE, GRID_SIZE);
+    });
+    ctx.globalAlpha = 1;
+  });
 
   // Draw grid for gameplay area
   ctx.strokeStyle = '#C8E6C9';
