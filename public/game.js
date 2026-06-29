@@ -18,13 +18,12 @@ let mouseX = 0; let mouseY = 0;
 let ws = null; let connected = false;
 let isDead = false;
 
-// Discord Quick Verification
 if (typeof DiscordSDK !== 'undefined') {
     const discordSdk = new DiscordSDK({ clientId: "1521223781362827395" });
     discordSdk.ready().then(() => discordSdk.commands.authorize({
         client_id: "1521223781362827395", response_type: "code", state: "", prompt: "none", scope: ["identify"]
     })).then(auth => discordSdk.commands.authenticate({ access_token: auth.code }))
-      .catch(e => console.log("Standard runtime execution loop"));
+      .catch(e => console.log("Standard runtime configuration loaded"));
 }
 
 playButton.addEventListener('click', enterGameArena);
@@ -129,7 +128,7 @@ function updateLeaderboardHUD() {
 }
 
 function drawGameFrame() {
-    ctx.fillStyle = '#dcdde1';
+    ctx.fillStyle = '#b2bec3';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     const me = players.find(p => p.id === playerId);
@@ -141,11 +140,11 @@ function drawGameFrame() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
-    // Canvas Background Area Field
+    // Arena Floor
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-    // Grid tracking layer accents
+    // Soft Arena Grid Accents
     ctx.strokeStyle = '#f1f2f6';
     ctx.lineWidth = 1;
     for (let x = 0; x < gameWidth; x += 40) {
@@ -155,25 +154,23 @@ function drawGameFrame() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(gameWidth, y); ctx.stroke();
     }
 
-    // DRAW MODERN SEAMLESS SMOOTH PAPER PLOTS
+    // Render Filled Territories Completely Seam-Free
     players.forEach(p => {
         ctx.fillStyle = p.color;
         p.territory.forEach(cell => {
-            // Overlapping slightly rounded rectangles create a clean fluid continuous sheet shape
-            ctx.beginPath();
-            ctx.roundRect(cell.x * CELL_SIZE - 0.5, cell.y * CELL_SIZE - 0.5, CELL_SIZE + 1, CELL_SIZE + 1, 3);
-            ctx.fill();
+            // Slight sizing expansion completely covers up underlying 90s gaps
+            ctx.fillRect(cell.x * CELL_SIZE - 0.5, cell.y * CELL_SIZE - 0.5, CELL_SIZE + 1.5, CELL_SIZE + 1.5);
         });
     });
 
-    // Trail ribbon layouts
+    // Drawing Path Ribbons
     players.forEach(p => {
         if (p.trail.length < 1) return;
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = 8;
+        ctx.lineWidth = 10;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.5;
         
         ctx.beginPath();
         ctx.moveTo(p.trail[0].x, p.trail[0].y);
@@ -184,7 +181,7 @@ function drawGameFrame() {
         ctx.globalAlpha = 1.0;
     });
 
-    // Active head tokens
+    // Heads
     players.forEach(p => {
         if (!p.alive) return;
         ctx.fillStyle = p.color;
@@ -192,7 +189,7 @@ function drawGameFrame() {
         ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
         ctx.fillStyle = '#2f3542';

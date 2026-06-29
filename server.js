@@ -10,9 +10,8 @@ const wss = new WebSocket.Server({ server });
 app.use(express.static(path.join(__dirname, 'public')));
 
 const MAP_SIZE = 1400;
-const CELL_SIZE = 16; // Grid engine block mapping index layout
+const CELL_SIZE = 16; 
 let players = {};
-let timeRemaining = 120;
 let gameActive = true;
 
 const colors = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800'];
@@ -35,6 +34,50 @@ function generateInitialTerritory(pX, pY) {
         }
     }
     return blocks;
+}
+
+// Helper to check if a point exists inside a coordinate array
+function hasCell(arr, x, y) {
+    return arr.some(c => c.x === x && c.y === y);
+}
+
+// Paper.io Bounding-Box Fill Algorithm
+function fillCapturedTerritory(territory, trail) {
+    if (trail.length === 0) return territory;
+
+    // Merge current territory and the new trail boundary
+    let combined = [...territory];
+    trail.forEach(t => {
+        if (!hasCell(combined, t.gX, t.gY)) {
+            combined.push({ x: t.gX, y: t.gY });
+        }
+    });
+
+    // Find the boundary box of the trail area
+    let minX = Math.min(...trail.map(t => t.gX)) - 1;
+    let maxX = Math.max(...trail.map(t => t.gX)) + 1;
+    let minY = Math.min(...trail.map(t => t.gY)) - 1;
+    let maxY = Math.max(...trail.map(t => t.gY)) + 1;
+
+    // Fill any enclosed holes within that box
+    for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+            if (!hasCell(combined, x, y)) {
+                // Raycasting check: if enclosed by the shape, fill it
+                let intersections = 0;
+                for (let i = x; i <= maxX; i++) {
+                    if (hasCell(combined, i, y)) {
+                        intersections++;
+                        break; // Simplistic edge hit
+                    }
+                }
+                if (intersections > 0) {
+                    combined.push({ x, y });
+                }
+            }
+        }
+    }
+    return combined;
 }
 
 wss.on('connection', (ws) => {
@@ -88,27 +131,23 @@ setInterval(() => {
         const currentGridX = Math.floor(p.x / CELL_SIZE);
         const currentGridY = Math.floor(p.y / CELL_SIZE);
         
-        const insideOwn = p.territory.some(t => t.x === currentGridX && t.y === currentGridY);
+        const insideOwn = hasCell(p.territory, currentGridX, currentGridY);
 
         if (!insideOwn) {
             if (p.vx !== 0 || p.vy !== 0) {
                 const lastTrail = p.trail[p.trail.length - 1];
-                if (!lastTrail || lastTrail.x !== p.x || lastTrail.y !== p.y) {
+                if (!lastTrail || lastTrail.gX !== currentGridX || lastTrail.gY !== currentGridY) {
                     p.trail.push({ x: p.x, y: p.y, gX: currentGridX, gY: currentGridY });
                 }
             }
         } else if (p.trail.length > 0) {
-            // Paper.io structural fill calculation
-            p.trail.forEach(tPoint => {
-                if (!p.territory.some(t => t.x === tPoint.gX && t.y === tPoint.gY)) {
-                    p.territory.push({ x: tPoint.gX, y: tPoint.gY });
-                }
-            });
+            // Trigger the absolute boundary fill calculation
+            p.territory = fillCapturedTerritory(p.territory, p.trail);
             p.trail = [];
         }
     });
 
-    // Clean Collision detection loop
+    // Handle Trail Collisions safely
     Object.keys(players).forEach(idA => {
         const pA = players[idA];
         if (!pA.alive) return;
@@ -118,7 +157,7 @@ setInterval(() => {
             if (!pB.alive) return;
 
             pB.trail.forEach((tPoint, index) => {
-                if (idA === idB && index > pB.trail.length - 8) return;
+                if (idA === idB && index > pB.trail.length - 5) return;
                 if (Math.hypot(pA.x - tPoint.x, pA.y - tPoint.y) < 14) {
                     pB.alive = false;
                 }
@@ -131,18 +170,15 @@ setInterval(() => {
         p.score = p.alive ? p.territory.length * 5 : 0;
     });
 
-    timeRemaining -= 0.05;
-
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
                 type: 'gameState',
-                players: Object.values(players),
-                timeRemaining: Math.max(0, timeRemaining)
+                players: Object.values(players)
             }));
         }
     });
 }, 50);
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Active server hosted on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
