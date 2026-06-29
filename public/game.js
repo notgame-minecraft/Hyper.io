@@ -1,3 +1,7 @@
+const nameScreen = document.getElementById('nameScreen');
+const nameInput = document.getElementById('nameInput');
+const playButton = document.getElementById('playButton');
+const gameContainer = document.getElementById('gameContainer');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const leaderboardDiv = document.getElementById('leaderboard');
@@ -16,6 +20,25 @@ let lastMouseY = 0;
 let ws = null;
 let connected = false;
 let useKeyboardControl = false;
+let gameStarted = false;
+const GRID_SIZE = 10;
+
+// Name screen handlers
+playButton.addEventListener('click', startGame);
+nameInput.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') startGame();
+});
+
+function startGame() {
+  const name = nameInput.value.trim() || `Player${Math.floor(Math.random() * 10000)}`;
+  playerName = name;
+  nameScreen.style.display = 'none';
+  gameContainer.style.display = 'flex';
+  gameStarted = true;
+  connectWebSocket();
+}
+
+nameInput.focus();
 
 // Resize canvas
 function resizeCanvas() {
@@ -39,6 +62,10 @@ function connectWebSocket() {
     statusDiv.textContent = '● Connected';
     statusDiv.className = 'connection-status connected';
     console.log('Connected to server');
+    
+    if (ws && connected) {
+      ws.send(JSON.stringify({ type: 'setName', name: playerName }));
+    }
   };
 
   ws.onmessage = (event) => {
@@ -46,13 +73,17 @@ function connectWebSocket() {
 
     if (data.type === 'init') {
       playerId = data.playerId;
-      playerName = data.playerName;
       gameWidth = data.gameWidth;
       gameHeight = data.gameHeight;
       console.log(`Initialized as ${playerName} (${playerId})`);
     } else if (data.type === 'gameState') {
       players = data.players;
       updateLeaderboard();
+      
+      const currentPlayer = players.find((p) => p.id === playerId);
+      if (currentPlayer && currentPlayer.trail.length > 0) {
+        checkCaptureOpportunity();
+      }
     }
   };
 
@@ -67,6 +98,21 @@ function connectWebSocket() {
     console.log('Disconnected from server');
     setTimeout(() => connectWebSocket(), 2000);
   };
+}
+
+function checkCaptureOpportunity() {
+  const currentPlayer = players.find((p) => p.id === playerId);
+  if (!currentPlayer || !currentPlayer.trail || currentPlayer.trail.length < 6) return;
+
+  const start = currentPlayer.trail[0];
+  const end = currentPlayer.trail[currentPlayer.trail.length - 1];
+  const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
+
+  if (distToStart < 50) {
+    if (ws && connected) {
+      ws.send(JSON.stringify({ type: 'captureCheck' }));
+    }
+  }
 }
 
 // Input handling
@@ -283,6 +329,4 @@ function gameLoop() {
   requestAnimationFrame(gameLoop);
 }
 
-// Start
-connectWebSocket();
 gameLoop();

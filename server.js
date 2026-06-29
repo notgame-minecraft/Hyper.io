@@ -12,7 +12,8 @@ const HOST = process.env.NODE_ENV === 'production' ? '0.0.0.0' : 'localhost';
 const GAME_WIDTH = 1000;
 const GAME_HEIGHT = 1000;
 const PLAYER_SIZE = 8;
-const MOVE_SPEED = 5;
+const MOVE_SPEED = 2;
+const GRID_SIZE = 10;
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'public')));
@@ -30,8 +31,8 @@ class Player {
   constructor(id, name) {
     this.id = id;
     this.name = name;
-    this.x = Math.random() * GAME_WIDTH;
-    this.y = Math.random() * GAME_HEIGHT;
+    this.x = Math.random() * (GAME_WIDTH - 60) + 30;
+    this.y = Math.random() * (GAME_HEIGHT - 60) + 30;
     this.vx = 0;
     this.vy = 0;
     this.trail = [];
@@ -39,6 +40,15 @@ class Player {
     this.alive = true;
     this.score = 0;
     this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+    this.inTrail = true; // True when outside territory, False when returning
+    
+    // Create initial 3x3 territory
+    for (let dx = -15; dx <= 15; dx += GRID_SIZE) {
+      for (let dy = -15; dy <= 15; dy += GRID_SIZE) {
+        const key = getKey(this.x + dx, this.y + dy);
+        this.territory.add(key);
+      }
+    }
   }
 
   update() {
@@ -67,7 +77,47 @@ class Player {
 }
 
 function getKey(x, y) {
-  return `${Math.floor(x / 10)},${Math.floor(y / 10)}`;
+  return `${Math.floor(x / GRID_SIZE)},${Math.floor(y / GRID_SIZE)}`;
+}
+
+function pointInPolygon(point, polygon) {
+  const x = point.x, y = point.y;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function captureTerritory(player) {
+  if (player.trail.length < 6) return; // Need at least a triangle
+  
+  // Check if trail forms a closed loop (player returned to starting area)
+  const start = player.trail[0];
+  const end = player.trail[player.trail.length - 1];
+  const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
+  
+  if (distToStart > 50) return; // Not closed enough
+  
+  // Capture all cells inside the trail
+  const capturedCells = new Set();
+  for (let x = 0; x < GAME_WIDTH; x += GRID_SIZE) {
+    for (let y = 0; y < GAME_HEIGHT; y += GRID_SIZE) {
+      const point = { x: x + GRID_SIZE / 2, y: y + GRID_SIZE / 2 };
+      if (pointInPolygon(point, player.trail)) {
+        const key = getKey(x, y);
+        if (!player.territory.has(key)) {
+          capturedCells.add(key);
+          player.territory.add(key);
+        }
+      }
+    }
+  }
+  
+  return capturedCells.size > 0;
 }
 
 function checkCollision(p1, p2) {
@@ -77,7 +127,7 @@ function checkCollision(p1, p2) {
 
 wss.on('connection', (ws) => {
   const playerId = Math.random().toString(36).substr(2, 9);
-  const playerName = `Player ${playerId.substr(0, 4)}`;
+  let playerName = `Player ${playerId.substr(0, 4)}`;
   const player = new Player(playerId, playerName);
   players.set(playerId, player);
 
@@ -96,9 +146,18 @@ wss.on('connection', (ws) => {
     try {
       const data = JSON.parse(message);
 
-      if (data.type === 'move') {
+      if (data.type === 'setName') {
+        playerName = data.name;
+        player.name = data.name;
+        console.log(`Player renamed: ${playerName} (${playerId})`);
+      } else if (data.type === 'move') {
         player.vx = data.vx;
         player.vy = data.vy;
+      } else if (data.type === 'captureCheck') {
+        const captured = captureTerritory(player);
+        if (captured) {
+          player.trail = [];
+        }
       }
     } catch (e) {
       console.error('Invalid message:', e);

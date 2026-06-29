@@ -22,6 +22,76 @@
       overflow: hidden;
     }
 
+    .name-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .name-screen-content {
+      text-align: center;
+      background: #222;
+      padding: 40px;
+      border-radius: 15px;
+      border: 2px solid #4ade80;
+      box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
+    }
+
+    .name-screen h1 {
+      font-size: 48px;
+      color: #4ade80;
+      margin-bottom: 20px;
+      text-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+    }
+
+    .name-screen p {
+      font-size: 18px;
+      color: #aaa;
+      margin-bottom: 20px;
+    }
+
+    .name-screen input {
+      width: 250px;
+      padding: 12px;
+      font-size: 16px;
+      border: 2px solid #4ade80;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #fff;
+      margin-bottom: 20px;
+      outline: none;
+    }
+
+    .name-screen input:focus {
+      border-color: #fbbf24;
+      box-shadow: 0 0 10px rgba(251, 191, 36, 0.3);
+    }
+
+    .name-screen button {
+      padding: 12px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      background: #4ade80;
+      color: #1a1a1a;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .name-screen button:hover {
+      background: #22c55e;
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(74, 222, 128, 0.5);
+    }
+
     .container {
       position: relative;
       display: flex;
@@ -162,7 +232,16 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div id="nameScreen" class="name-screen">
+    <div class="name-screen-content">
+      <h1>Hyper.io</h1>
+      <p>Enter your username</p>
+      <input type="text" id="nameInput" placeholder="Your name" maxlength="20" />
+      <button id="playButton">PLAY</button>
+    </div>
+  </div>
+
+  <div id="gameContainer" class="container" style="display: none;">
     <canvas id="gameCanvas"></canvas>
     <div class="sidebar">
       <div>
@@ -191,7 +270,5 @@
       </div>
     </div>
   </div>
-
-  <script src="game.js"></script>
 </body>
 </html>
