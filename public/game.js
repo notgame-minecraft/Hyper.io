@@ -11,8 +11,11 @@ let playerName = null;
 let players = [];
 let mouseX = 0;
 let mouseY = 0;
+let lastMouseX = 0;
+let lastMouseY = 0;
 let ws = null;
 let connected = false;
+let useKeyboardControl = false;
 
 // Resize canvas
 function resizeCanvas() {
@@ -68,21 +71,38 @@ function connectWebSocket() {
 
 // Input handling
 document.addEventListener('mousemove', (e) => {
-  mouseX = e.clientX;
-  mouseY = e.clientY;
+  const newMouseX = e.clientX;
+  const newMouseY = e.clientY;
+  
+  // If mouse moved significantly, disable keyboard control
+  if (Math.hypot(newMouseX - lastMouseX, newMouseY - lastMouseY) > 5) {
+    useKeyboardControl = false;
+  }
+  
+  mouseX = newMouseX;
+  mouseY = newMouseY;
+  lastMouseX = newMouseX;
+  lastMouseY = newMouseY;
 });
 
 document.addEventListener('touchmove', (e) => {
   if (e.touches.length > 0) {
     mouseX = e.touches[0].clientX;
     mouseY = e.touches[0].clientY;
+    useKeyboardControl = false;
   }
   e.preventDefault();
 });
 
 const keys = {};
 document.addEventListener('keydown', (e) => {
-  keys[e.key.toLowerCase()] = true;
+  const key = e.key.toLowerCase();
+  keys[key] = true;
+  
+  // Enable keyboard control when WASD is pressed
+  if (key === 'w' || key === 'a' || key === 's' || key === 'd') {
+    useKeyboardControl = true;
+  }
 });
 
 document.addEventListener('keyup', (e) => {
@@ -97,23 +117,25 @@ function updatePlayer() {
   let vx = 0;
   let vy = 0;
 
-  // Mouse/touch input
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const dx = mouseX - centerX;
-  const dy = mouseY - centerY;
-  const dist = Math.hypot(dx, dy);
+  if (useKeyboardControl) {
+    // Keyboard input only
+    if (keys['w']) vy -= 1;
+    if (keys['s']) vy += 1;
+    if (keys['a']) vx -= 1;
+    if (keys['d']) vx += 1;
+  } else {
+    // Mouse/touch input
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dx = mouseX - centerX;
+    const dy = mouseY - centerY;
+    const dist = Math.hypot(dx, dy);
 
-  if (dist > 10) {
-    vx += dx / dist;
-    vy += dy / dist;
+    if (dist > 10) {
+      vx += dx / dist;
+      vy += dy / dist;
+    }
   }
-
-  // Keyboard input
-  if (keys['w']) vy -= 1;
-  if (keys['s']) vy += 1;
-  if (keys['a']) vx -= 1;
-  if (keys['d']) vx += 1;
 
   // Normalize
   const mag = Math.hypot(vx, vy);
@@ -172,8 +194,9 @@ function drawGame() {
   const scaleY = canvas.height / gameHeight;
   const scale = Math.min(scaleX, scaleY);
 
-  const offsetX = (canvas.width - gameWidth * scale) / 2 - currentPlayer.x * scale;
-  const offsetY = (canvas.height - gameHeight * scale) / 2 - currentPlayer.y * scale;
+  // Center player on screen
+  const offsetX = canvas.width / 2 - currentPlayer.x * scale;
+  const offsetY = canvas.height / 2 - currentPlayer.y * scale;
 
   ctx.save();
   ctx.translate(offsetX, offsetY);
