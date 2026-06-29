@@ -7,7 +7,6 @@ const ctx = canvas.getContext('2d');
 const leaderboardDiv = document.getElementById('leaderboard');
 const statusDiv = document.getElementById('status');
 
-// Game variables
 let gameWidth = 1000;
 let gameHeight = 1000;
 let playerId = null;
@@ -23,12 +22,10 @@ let useKeyboardControl = false;
 let gameStarted = false;
 const GRID_SIZE = 10;
 
-// Game state from server
 let timeRemaining = 90;
 let gameActive = true;
 let winner = null;
 
-// Discord SDK Integration
 let discordSDK = null;
 let isInDiscord = false;
 
@@ -49,9 +46,7 @@ async function initializeDiscord() {
       discordSDK = sdk;
       isInDiscord = true;
       console.log("✅ Discord Activity initialized!");
-      sdk.subscribe("READY", (data) => {
-        console.log("Discord ready:", data);
-      });
+      sdk.subscribe("READY", (data) => { console.log("Discord ready:", data); });
     }
   } catch (err) {
     console.log("Standalone mode (not in Discord)");
@@ -62,9 +57,7 @@ async function initializeDiscord() {
 initializeDiscord();
 
 playButton.addEventListener('click', startGame);
-nameInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') startGame();
-});
+nameInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') startGame(); });
 
 function startGame() {
   const name = nameInput.value.trim() || `Player${Math.floor(Math.random() * 10000)}`;
@@ -83,7 +76,6 @@ function resizeCanvas() {
   canvas.width = maxWidth;
   canvas.height = maxHeight;
 }
-
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
@@ -107,10 +99,7 @@ function connectWebSocket() {
       gameWidth = data.gameWidth;
       gameHeight = data.gameHeight;
     } else if (data.type === 'gameState') {
-      players = data.players.map(p => ({
-        ...p,
-        territory: new Set(p.territory || [])
-      }));
+      players = data.players.map(p => ({ ...p, territory: new Set(p.territory || []) }));
       timeRemaining = data.timeRemaining || 90;
       gameActive = data.gameActive !== false;
       winner = data.winner || null;
@@ -129,13 +118,9 @@ function connectWebSocket() {
 document.addEventListener('mousemove', (e) => {
   const newMouseX = e.clientX;
   const newMouseY = e.clientY;
-  if (Math.hypot(newMouseX - lastMouseX, newMouseY - lastMouseY) > 5) {
-    useKeyboardControl = false;
-  }
-  mouseX = newMouseX;
-  mouseY = newMouseY;
-  lastMouseX = newMouseX;
-  lastMouseY = newMouseY;
+  if (Math.hypot(newMouseX - lastMouseX, newMouseY - lastMouseY) > 5) useKeyboardControl = false;
+  mouseX = newMouseX; mouseY = newMouseY;
+  lastMouseX = newMouseX; lastMouseY = newMouseY;
 });
 
 const keys = {};
@@ -152,22 +137,19 @@ function updatePlayer() {
   let vx = 0; let vy = 0;
 
   if (useKeyboardControl) {
-    if (keys['w']) vy -= 1;
-    if (keys['s']) vy += 1;
-    if (keys['a']) vx -= 1;
-    if (keys['d']) vx += 1;
+    if (keys['w']) vy -= 1; if (keys['s']) vy += 1;
+    if (keys['a']) vx -= 1; if (keys['d']) vx += 1;
   } else {
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const dx = mouseX - centerX;
-    const dy = mouseY - centerY;
+    const dx = mouseX - centerX; const dy = mouseY - centerY;
     const dist = Math.hypot(dx, dy);
     if (dist > 10) { vx = dx / dist; vy = dy / dist; }
   }
 
   const mag = Math.hypot(vx, vy);
   if (mag > 0) { vx /= mag; vy /= mag; }
-  if (ws && connected) { ws.send(JSON.stringify({ type: 'move', vx, vy })); }
+  if (ws && connected) ws.send(JSON.stringify({ type: 'move', vx, vy }));
 }
 
 function updateLeaderboard() {
@@ -206,7 +188,7 @@ function drawGame() {
   ctx.fillStyle = '#E8F5E9';
   ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-  // DRAW TERRITORIES AS CIRCLES INSTEAD OF SQUARES
+  // RENDER TERRITORY RADII AS SMOOTH OVERLAPPING CIRCLES (NO SQUARES)
   players.forEach((player) => {
     ctx.fillStyle = player.color;
     player.territory.forEach((key) => {
@@ -214,16 +196,15 @@ function drawGame() {
       const centerX = x * GRID_SIZE + GRID_SIZE / 2;
       const centerY = y * GRID_SIZE + GRID_SIZE / 2;
       ctx.beginPath();
-      ctx.arc(centerX, centerY, GRID_SIZE / 2 + 0.5, 0, Math.PI * 2);
+      ctx.arc(centerX, centerY, GRID_SIZE / 2 + 1.0, 0, Math.PI * 2);
       ctx.fill();
     });
   });
 
   // Trails and players
   players.forEach((player) => {
-    // Solid ribbon trail
     ctx.strokeStyle = player.color;
-    ctx.lineWidth = 12;
+    ctx.lineWidth = 14; 
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     
@@ -237,10 +218,10 @@ function drawGame() {
     }
 
     if (player.alive) {
-      // CIRCULAR PLAYER BODY
+      // CIRCULAR PLAYER AVATAR
       ctx.fillStyle = player.color;
       ctx.beginPath();
-      ctx.arc(player.x, player.y, 6, 0, Math.PI * 2);
+      ctx.arc(player.x, player.y, 7, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1.5;
@@ -249,21 +230,21 @@ function drawGame() {
       ctx.fillStyle = '#000';
       ctx.font = `bold ${14 / scale}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText(player.name, player.x, player.y - 12);
+      ctx.fillText(player.name, player.x, player.y - 14);
       
       if (player.id === playerId) {
         ctx.fillStyle = '#FF0000';
         ctx.font = `bold ${10 / scale}px Arial`;
-        ctx.fillText('YOU', player.x, player.y + 16);
+        ctx.fillText('YOU', player.x, player.y + 18);
       }
     }
   });
 
   ctx.restore();
 
-  // DARK HUD BOX FOR VISIBILITY ON DISCORD
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.fillRect(10, 10, 200, 80);
+  // HIGH-VISIBILITY DISCORD HUD BACKING BOX
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+  ctx.fillRect(10, 10, 210, 85);
 
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 16px Arial';
@@ -271,10 +252,10 @@ function drawGame() {
   
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = Math.floor(timeRemaining % 60);
-  ctx.fillText(`⏱ Timer: ${minutes}:${seconds.toString().padStart(2, '0')}`, 20, 35);
+  ctx.fillText(`⏱ Timer: ${minutes}:${seconds.toString().padStart(2, '0')}`, 25, 35);
   ctx.font = '14px Arial';
-  ctx.fillText(`Score: ${Math.floor(currentPlayer.score)} pts`, 20, 55);
-  ctx.fillText(`Alive: ${players.filter(p => p.alive).length}/${players.length}`, 20, 75);
+  ctx.fillText(`Score: ${Math.floor(currentPlayer.score)} pts`, 25, 55);
+  ctx.fillText(`Alive: ${players.filter(p => p.alive).length}/${players.length}`, 25, 75);
 
   if (!gameActive && winner) {
     ctx.font = 'bold 24px Arial';
