@@ -67,14 +67,15 @@ class Player {
     const currentKey = getKey(this.x, this.y);
     const inOwnTerritory = this.territory.has(currentKey);
     
-    // Only add to trail when outside own territory
-    if (!inOwnTerritory && this.trail.length < 500) {
+    // Add trail when outside own territory
+    if (!inOwnTerritory) {
       this.trail.push({ x: this.x, y: this.y });
-    }
-
-    // Keep trail limited
-    if (this.trail.length > 500) {
-      this.trail.shift();
+      if (this.trail.length > 500) {
+        this.trail.shift();
+      }
+    } else if (inOwnTerritory && this.trail.length > 0) {
+      // Returned to own territory - capture!
+      this.pendingCapture = true;
     }
   }
 
@@ -100,13 +101,7 @@ function pointInPolygon(point, polygon) {
 }
 
 function captureTerritory(player) {
-  if (player.trail.length < 6) return;
-  
-  // Check if trail connects back to own territory
-  const end = player.trail[player.trail.length - 1];
-  const endKey = getKey(end.x, end.y);
-  
-  if (!player.territory.has(endKey)) return;
+  if (player.trail.length < 10) return; // Need minimum trail length
   
   // Capture all cells inside the trail
   const capturedCells = new Set();
@@ -119,6 +114,8 @@ function captureTerritory(player) {
       }
     }
   }
+  
+  if (capturedCells.size === 0) return;
   
   // Steal territory from other players
   players.forEach((otherPlayer) => {
@@ -136,7 +133,8 @@ function captureTerritory(player) {
     player.territory.add(key);
   });
   
-  return capturedCells.size > 0;
+  console.log(`${player.name} captured ${capturedCells.size} cells!`);
+  return true;
 }
 
 function isPlayerInOwnTerritory(player) {
@@ -244,19 +242,37 @@ function updateGame() {
     }
   });
 
-  // Check if player trail closed (auto-capture)
+  // Process pending captures
   players.forEach((player) => {
-    if (player.alive && player.trail.length > 10) {
-      const end = player.trail[player.trail.length - 1];
-      const endKey = getKey(end.x, end.y);
-      if (player.territory.has(endKey)) {
-        captureTerritory(player);
-        player.trail = [];
-      }
+    if (player.alive && player.pendingCapture && player.trail.length > 10) {
+      captureTerritory(player);
+      player.trail = [];
+      player.pendingCapture = false;
     }
   });
 
-  // Check collisions between players
+  // Check collisions between players and enemy trails
+  players.forEach((player) => {
+    if (!player.alive || player.trail.length === 0) return;
+    
+    // Check if player hit any other player's trail
+    players.forEach((otherPlayer) => {
+      if (otherPlayer.id === player.id || otherPlayer.trail.length === 0) return;
+      
+      // Check if player is in other player's trail
+      for (let trailPoint of otherPlayer.trail) {
+        const dist = Math.hypot(player.x - trailPoint.x, player.y - trailPoint.y);
+        if (dist < 15) {
+          // Hit enemy trail!
+          player.alive = false;
+          otherPlayer.trail = [];
+          break;
+        }
+      }
+    });
+  });
+
+  // Check collisions between players (direct hit)
   const playerArray = Array.from(players.values());
   for (let i = 0; i < playerArray.length; i++) {
     for (let j = i + 1; j < playerArray.length; j++) {

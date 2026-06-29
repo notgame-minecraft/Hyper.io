@@ -159,18 +159,8 @@ function connectWebSocket() {
 }
 
 function checkCaptureOpportunity() {
-  const currentPlayer = players.find((p) => p.id === playerId);
-  if (!currentPlayer || !currentPlayer.trail || currentPlayer.trail.length < 6) return;
-
-  const start = currentPlayer.trail[0];
-  const end = currentPlayer.trail[currentPlayer.trail.length - 1];
-  const distToStart = Math.hypot(end.x - start.x, end.y - start.y);
-
-  if (distToStart < 80) {
-    if (ws && connected) {
-      ws.send(JSON.stringify({ type: 'captureCheck' }));
-    }
-  }
+  // Capture is now handled server-side automatically
+  // This function is kept for compatibility but does nothing
 }
 
 // Input handling
