@@ -187,6 +187,7 @@ function broadcastGameState() {
       alive: p.alive,
       color: p.color,
       score: Math.floor(p.getTerritoryArea()),
+      territory: Array.from(p.territory), // Convert Set to Array for JSON serialization
     })),
   };
 

@@ -77,7 +77,12 @@ function connectWebSocket() {
       gameHeight = data.gameHeight;
       console.log(`Initialized as ${playerName} (${playerId})`);
     } else if (data.type === 'gameState') {
-      players = data.players;
+      // Convert territory arrays back to Sets
+      players = data.players.map(p => ({
+        ...p,
+        territory: new Set(p.territory || [])
+      }));
+      console.log(`Received gameState with ${players.length} players`);
       updateLeaderboard();
       
       const currentPlayer = players.find((p) => p.id === playerId);
@@ -219,31 +224,41 @@ function updateLeaderboard() {
 function drawGame() {
   // Draw outside background
   const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, '#87CEEB'); // Sky blue
+  gradient.addColorStop(0, '#87CEEB');
   gradient.addColorStop(0.7, '#87CEEB');
-  gradient.addColorStop(1, '#90EE90'); // Grass green
+  gradient.addColorStop(1, '#90EE90');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Draw grass ground
   ctx.fillStyle = '#7CB342';
   ctx.fillRect(0, canvas.height * 0.65, canvas.width, canvas.height * 0.35);
 
-  if (!playerId) return;
+  // Debug: Show current state
+  ctx.fillStyle = '#000';
+  ctx.font = '12px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`Players: ${players.length} | Your ID: ${playerId ? playerId.substr(0, 8) : 'NOT SET'}`, 10, 20);
+
+  if (!playerId || players.length === 0) {
+    ctx.fillText('Waiting for game data...', 10, 40);
+    return;
+  }
 
   // Find current player
   const currentPlayer = players.find((p) => p.id === playerId);
-  if (!currentPlayer) return;
+  if (!currentPlayer) {
+    ctx.fillText(`Error: You (${playerId.substr(0, 8)}) not found in players list!`, 10, 40);
+    ctx.fillText(`Available players: ${players.map(p => p.id.substr(0, 4)).join(', ')}`, 10, 55);
+    return;
+  }
 
-  // Calculate scale and offset to center on current player
   const scaleX = canvas.width / gameWidth;
   const scaleY = canvas.height / gameHeight;
   let scale = Math.min(scaleX, scaleY);
   
   // Zoom out to see more of the map
-  scale = scale * 0.4; // Show 2.5x more area
+  scale = scale * 0.4;
 
-  // Center player on screen
   const offsetX = canvas.width / 2 - currentPlayer.x * scale;
   const offsetY = canvas.height / 2 - currentPlayer.y * scale;
 
