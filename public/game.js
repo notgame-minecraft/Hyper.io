@@ -301,25 +301,36 @@ function drawGame() {
 
     ctx.globalAlpha = 1;
 
-    // Draw player body as a block
+    // Larger, more visible player body
+    const isCurrentPlayer = player.id === playerId;
+    const playerSize = isCurrentPlayer ? 12 : 8;
+
     if (player.alive) {
       ctx.fillStyle = player.color;
     } else {
       ctx.fillStyle = '#999';
     }
-    ctx.fillRect(player.x - 8, player.y - 8, 16, 16);
+    ctx.fillRect(player.x - playerSize, player.y - playerSize, playerSize * 2, playerSize * 2);
 
-    // Draw thick border so player is always visible
+    // Thick border
     ctx.strokeStyle = '#000';
-    ctx.lineWidth = 2 / scale;
-    ctx.strokeRect(player.x - 8, player.y - 8, 16, 16);
+    ctx.lineWidth = 3 / scale;
+    ctx.strokeRect(player.x - playerSize, player.y - playerSize, playerSize * 2, playerSize * 2);
 
     // Draw player name
     ctx.fillStyle = '#000';
-    ctx.font = `bold ${12 / scale}px Arial`;
+    ctx.font = `bold ${14 / scale}px Arial`;
     ctx.textAlign = 'center';
-    ctx.globalAlpha = 0.9;
-    ctx.fillText(player.name, player.x, player.y - 25 / scale);
+    ctx.globalAlpha = 0.95;
+    ctx.fillText(player.name, player.x, player.y - playerSize - 8 / scale);
+    
+    // Label current player as "YOU"
+    if (isCurrentPlayer) {
+      ctx.fillStyle = '#FF0000';
+      ctx.font = `bold ${10 / scale}px Arial`;
+      ctx.fillText('YOU', player.x, player.y + playerSize + 8 / scale);
+    }
+    
     ctx.globalAlpha = 1;
   });
 
