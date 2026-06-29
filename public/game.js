@@ -238,7 +238,10 @@ function drawGame() {
   // Calculate scale and offset to center on current player
   const scaleX = canvas.width / gameWidth;
   const scaleY = canvas.height / gameHeight;
-  const scale = Math.min(scaleX, scaleY);
+  let scale = Math.min(scaleX, scaleY);
+  
+  // Zoom out to see more of the map
+  scale = scale * 0.4; // Show 2.5x more area
 
   // Center player on screen
   const offsetX = canvas.width / 2 - currentPlayer.x * scale;
@@ -336,15 +339,15 @@ function drawGame() {
 
   ctx.restore();
 
-  // Draw center crosshair to show your position
-  ctx.strokeStyle = '#000';
-  ctx.lineWidth = 2;
+  // Draw center crosshair to show your position (bigger now that zoomed out)
+  ctx.strokeStyle = '#FF0000';
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(canvas.width / 2 - 15, canvas.height / 2);
-  ctx.lineTo(canvas.width / 2 + 15, canvas.height / 2);
+  ctx.moveTo(canvas.width / 2 - 30, canvas.height / 2);
+  ctx.lineTo(canvas.width / 2 + 30, canvas.height / 2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(canvas.width / 2, canvas.height / 2 - 15);
+  ctx.moveTo(canvas.width / 2, canvas.height / 2 - 30);
   ctx.lineTo(canvas.width / 2, canvas.height / 2 + 15);
   ctx.stroke();
 
