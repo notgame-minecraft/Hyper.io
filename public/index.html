@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hyper.io - Multiplayer Territory Game</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .container {
+      position: relative;
+      display: flex;
+      gap: 20px;
+      width: 100%;
+      height: 100vh;
+      padding: 10px;
+    }
+
+    #gameCanvas {
+      border: 2px solid #333;
+      background: #0a0a0a;
+      cursor: crosshair;
+      flex: 1;
+      max-width: 1000px;
+      image-rendering: pixelated;
+    }
+
+    .sidebar {
+      width: 250px;
+      background: #222;
+      border-radius: 10px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      border: 1px solid #444;
+    }
+
+    .sidebar h2 {
+      color: #4ade80;
+      font-size: 18px;
+      border-bottom: 2px solid #4ade80;
+      padding-bottom: 10px;
+    }
+
+    .player-info {
+      background: #1a1a1a;
+      padding: 10px;
+      border-radius: 5px;
+      border-left: 4px solid #4ade80;
+    }
+
+    .player-info.you {
+      border-left-color: #fbbf24;
+      background: #2a2400;
+    }
+
+    .player-name {
+      font-weight: bold;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .player-score {
+      color: #888;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .controls {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #444;
+    }
+
+    .controls h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #888;
+    }
+
+    .controls p {
+      font-size: 12px;
+      color: #666;
+      margin: 5px 0;
+    }
+
+    .instructions {
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #444;
+    }
+
+    .instructions h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #888;
+    }
+
+    .instructions p {
+      font-size: 12px;
+      color: #666;
+      margin: 5px 0;
+      line-height: 1.4;
+    }
+
+    .connection-status {
+      text-align: center;
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 12px;
+      background: #0a0a0a;
+      border: 1px solid #444;
+    }
+
+    .connection-status.connected {
+      color: #4ade80;
+      border-color: #4ade80;
+    }
+
+    .connection-status.disconnected {
+      color: #ef4444;
+      border-color: #ef4444;
+    }
+
+    @media (max-width: 1200px) {
+      .container {
+        flex-direction: column;
+      }
+
+      #gameCanvas {
+        max-width: 100%;
+        height: 60vh;
+      }
+
+      .sidebar {
+        width: 100%;
+        max-height: 200px;
+        flex-direction: row;
+        gap: 10px;
+        overflow-x: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <canvas id="gameCanvas"></canvas>
+    <div class="sidebar">
+      <div>
+        <div class="connection-status disconnected" id="status">
+          Connecting...
+        </div>
+      </div>
+
+      <div class="controls">
+        <h3>CONTROLS</h3>
+        <p><strong>Mouse/Touch:</strong> Move to aim</p>
+        <p><strong>WASD:</strong> Alternative movement</p>
+      </div>
+
+      <div>
+        <h2>LEADERBOARD</h2>
+        <div id="leaderboard"></div>
+      </div>
+
+      <div class="instructions">
+        <h3>HOW TO PLAY</h3>
+        <p>🎮 Capture territory by drawing lines</p>
+        <p>💥 Avoid colliding with other players</p>
+        <p>📊 Gain points by controlling area</p>
+        <p>🏆 Be the last player standing!</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+</body>
+</html>
