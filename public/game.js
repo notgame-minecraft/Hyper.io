@@ -309,9 +309,9 @@ function drawGame() {
     }
     ctx.fillRect(player.x - 8, player.y - 8, 16, 16);
 
-    // Draw block outline
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-    ctx.lineWidth = 1 / scale;
+    // Draw thick border so player is always visible
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2 / scale;
     ctx.strokeRect(player.x - 8, player.y - 8, 16, 16);
 
     // Draw player name
@@ -324,6 +324,18 @@ function drawGame() {
   });
 
   ctx.restore();
+
+  // Draw center crosshair to show your position
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2 - 15, canvas.height / 2);
+  ctx.lineTo(canvas.width / 2 + 15, canvas.height / 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(canvas.width / 2, canvas.height / 2 - 15);
+  ctx.lineTo(canvas.width / 2, canvas.height / 2 + 15);
+  ctx.stroke();
 
   // Draw HUD
   ctx.fillStyle = '#fff';
