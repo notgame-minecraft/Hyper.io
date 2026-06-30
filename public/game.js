@@ -5,6 +5,7 @@ const gameContainer = document.getElementById('gameContainer');
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const playersList = document.getElementById('playersList');
+const timerHUD = document.getElementById('timerHUD');
 const gameOverScreen = document.getElementById('gameOverScreen');
 const finalScore = document.getElementById('finalScore');
 const respawnBtn = document.getElementById('respawnBtn');
@@ -17,14 +18,6 @@ let players = [];
 let mouseX = 0; let mouseY = 0;
 let ws = null; let connected = false;
 let isDead = false;
-
-if (typeof DiscordSDK !== 'undefined') {
-    const discordSdk = new DiscordSDK({ clientId: "1521223781362827395" });
-    discordSdk.ready().then(() => discordSdk.commands.authorize({
-        client_id: "1521223781362827395", response_type: "code", state: "", prompt: "none", scope: ["identify"]
-    })).then(auth => discordSdk.commands.authenticate({ access_token: auth.code }))
-      .catch(e => console.log("Standard runtime configuration loaded"));
-}
 
 playButton.addEventListener('click', enterGameArena);
 respawnBtn.addEventListener('click', respawnPlayer);
@@ -41,27 +34,34 @@ function connectServer() {
     };
 
     ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        if (data.type === 'init') {
-            playerId = data.playerId;
-            gameWidth = data.gameWidth;
-            gameHeight = data.gameHeight;
-        } else if (data.type === 'gameState') {
-            players = data.players;
-            
-            const me = players.find(p => p.id === playerId);
-            if (me) {
-                if (!me.alive && !isDead) {
+        try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'init') {
+                playerId = data.playerId;
+                gameWidth = data.gameWidth;
+                gameHeight = data.gameHeight;
+            } else if (data.type === 'gameState') {
+                players = data.players || [];
+                
+                // Formatted countdown updates
+                if (data.gameTime !== undefined) {
+                    let mins = Math.floor(data.gameTime / 60);
+                    let secs = Math.floor(data.gameTime % 60);
+                    timerHUD.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                }
+                
+                if (!playerId) return;
+                const me = players.find(p => p.id === playerId);
+                if (me && !me.alive && !isDead) {
                     isDead = true;
                     finalScore.textContent = `Your Score: ${me.score} pts`;
                     gameOverScreen.style.display = 'flex';
                 }
+                updateLeaderboardHUD();
             }
-            updateLeaderboardHUD();
-        }
+        } catch(e) { console.error(e); }
     };
-
-    ws.onclose = () => { connected = false; ws = null; };
+    ws.onclose = () => { connected = false; ws = null; playerId = null; };
 }
 
 function enterGameArena() {
@@ -92,20 +92,21 @@ function returnToMainMenu() {
 }
 
 function resizeContainer() {
-    canvas.width = Math.min(window.innerWidth, 1100);
-    canvas.height = Math.min(window.innerHeight, 900);
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 }
 window.addEventListener('resize', resizeContainer);
 resizeContainer();
 
 document.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    mouseX = e.clientX - rect.left;
-    mouseY = e.clientY - rect.top;
+    mouseX = e.clientX; mouseY = e.clientY;
 });
 
 function sendMovementVector() {
-    if (!connected || isDead) return;
+    if (!connected || isDead || !playerId) return;
+    const me = players.find(p => p.id === playerId);
+    if (!me || !me.alive) return;
+
     const dx = mouseX - (canvas.width / 2);
     const dy = mouseY - (canvas.height / 2);
     const dist = Math.hypot(dx, dy);
@@ -118,10 +119,14 @@ function sendMovementVector() {
 }
 
 function updateLeaderboardHUD() {
+    if (players.length === 0) return;
     const sorted = [...players].sort((a,b)=>b.score-a.score).slice(0,5);
     playersList.innerHTML = sorted.map((p, i) => `
         <div class="player-info ${p.id === playerId ? 'you' : ''}">
-            <span>${i+1}. ${p.name}</span>
+            <span style="display:flex; align-items:center;">
+                <span class="player-color-badge" style="background:${p.color};"></span>
+                ${i+1}. ${p.name}
+            </span>
             <span>${p.score}</span>
         </div>
     `).join('');
@@ -130,6 +135,11 @@ function updateLeaderboardHUD() {
 function drawGameFrame() {
     ctx.fillStyle = '#b2bec3';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!playerId || players.length === 0) { 
+        requestAnimationFrame(drawGameFrame); 
+        return; 
+    }
 
     const me = players.find(p => p.id === playerId);
     if (!me) { requestAnimationFrame(drawGameFrame); return; }
@@ -140,11 +150,10 @@ function drawGameFrame() {
     ctx.save();
     ctx.translate(offsetX, offsetY);
 
-    // Arena Floor
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-    // Soft Arena Grid Accents
+    // Grid lines
     ctx.strokeStyle = '#f1f2f6';
     ctx.lineWidth = 1;
     for (let x = 0; x < gameWidth; x += 40) {
@@ -154,29 +163,26 @@ function drawGameFrame() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(gameWidth, y); ctx.stroke();
     }
 
-    // Render Filled Territories Completely Seam-Free
+    // Territories
     players.forEach(p => {
+        if (!p.territory) return;
         ctx.fillStyle = p.color;
         p.territory.forEach(cell => {
-            // Slight sizing expansion completely covers up underlying 90s gaps
-            ctx.fillRect(cell.x * CELL_SIZE - 0.5, cell.y * CELL_SIZE - 0.5, CELL_SIZE + 1.5, CELL_SIZE + 1.5);
+            ctx.fillRect(cell.x * CELL_SIZE - 0.3, cell.y * CELL_SIZE - 0.3, CELL_SIZE + 0.6, CELL_SIZE + 0.6);
         });
     });
 
-    // Drawing Path Ribbons
+    // Trails
     players.forEach(p => {
-        if (p.trail.length < 1) return;
+        if (!p.trail || p.trail.length < 1) return;
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 10;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.globalAlpha = 0.5;
-        
         ctx.beginPath();
         ctx.moveTo(p.trail[0].x, p.trail[0].y);
-        for(let i=1; i<p.trail.length; i++) {
-            ctx.lineTo(p.trail[i].x, p.trail[i].y);
-        }
+        for(let i=1; i<p.trail.length; i++) { ctx.lineTo(p.trail[i].x, p.trail[i].y); }
         ctx.stroke();
         ctx.globalAlpha = 1.0;
     });
@@ -185,12 +191,8 @@ function drawGameFrame() {
     players.forEach(p => {
         if (!p.alive) return;
         ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 10, 0, Math.PI*2);
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
 
         ctx.fillStyle = '#2f3542';
         ctx.font = 'bold 12px sans-serif';

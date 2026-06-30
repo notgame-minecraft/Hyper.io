@@ -12,13 +12,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
 let players = {};
-let gameActive = true;
+let gameTime = 120; // 2 Minutes match timer countdown clock
 
 const colors = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800'];
-
-function getRandomColor() {
-    return colors[Math.floor(Math.random() * colors.length)];
-}
+function getRandomColor() { return colors[Math.floor(Math.random() * colors.length)]; }
 
 function generateInitialTerritory(pX, pY) {
     let blocks = [];
@@ -36,48 +33,28 @@ function generateInitialTerritory(pX, pY) {
     return blocks;
 }
 
-// Helper to check if a point exists inside a coordinate array
-function hasCell(arr, x, y) {
-    return arr.some(c => c.x === x && c.y === y);
-}
-
-// Paper.io Bounding-Box Fill Algorithm
 function fillCapturedTerritory(territory, trail) {
-    if (trail.length === 0) return territory;
+    let cellMap = new Map();
+    territory.forEach(c => cellMap.set(`${c.x},${c.y}`, { x: c.x, y: c.y }));
+    trail.forEach(t => cellMap.set(`${t.gX},${t.gY}`, { x: t.gX, y: t.gY }));
 
-    // Merge current territory and the new trail boundary
-    let combined = [...territory];
-    trail.forEach(t => {
-        if (!hasCell(combined, t.gX, t.gY)) {
-            combined.push({ x: t.gX, y: t.gY });
-        }
-    });
+    let trailX = trail.map(t => t.gX);
+    let trailY = trail.map(t => t.gY);
+    let minX = Math.min(...trailX) - 1; let maxX = Math.max(...trailX) + 1;
+    let minY = Math.min(...trailY) - 1; let maxY = Math.max(...trailY) + 1;
 
-    // Find the boundary box of the trail area
-    let minX = Math.min(...trail.map(t => t.gX)) - 1;
-    let maxX = Math.max(...trail.map(t => t.gX)) + 1;
-    let minY = Math.min(...trail.map(t => t.gY)) - 1;
-    let maxY = Math.max(...trail.map(t => t.gY)) + 1;
-
-    // Fill any enclosed holes within that box
     for (let x = minX; x <= maxX; x++) {
         for (let y = minY; y <= maxY; y++) {
-            if (!hasCell(combined, x, y)) {
-                // Raycasting check: if enclosed by the shape, fill it
+            if (!cellMap.has(`${x},${y}`)) {
                 let intersections = 0;
                 for (let i = x; i <= maxX; i++) {
-                    if (hasCell(combined, i, y)) {
-                        intersections++;
-                        break; // Simplistic edge hit
-                    }
+                    if (cellMap.has(`${i},${y}`)) { intersections++; break; }
                 }
-                if (intersections > 0) {
-                    combined.push({ x, y });
-                }
+                if (intersections > 0) { cellMap.set(`${x},${y}`, { x, y }); }
             }
         }
     }
-    return combined;
+    return Array.from(cellMap.values());
 }
 
 wss.on('connection', (ws) => {
@@ -86,7 +63,6 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         try {
             const data = JSON.parse(message);
-            
             if (data.type === 'spawn') {
                 const sX = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
                 const sY = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
@@ -101,37 +77,28 @@ wss.on('connection', (ws) => {
                 };
                 ws.send(JSON.stringify({ type: 'init', playerId, gameWidth: MAP_SIZE, gameHeight: MAP_SIZE }));
             }
-            
             const player = players[playerId];
             if (!player || !player.alive) return;
-
             if (data.type === 'move') {
-                player.vx = data.vx || 0;
-                player.vy = data.vy || 0;
+                player.vx = data.vx || 0; player.vy = data.vy || 0;
             }
         } catch (e) { console.error(e); }
     });
-
     ws.on('close', () => { delete players[playerId]; });
 });
 
 setInterval(() => {
-    if (!gameActive) return;
-
     Object.keys(players).forEach(id => {
         const p = players[id];
         if (!p.alive) return;
 
-        p.x += p.vx * 5.5;
-        p.y += p.vy * 5.5;
-
+        p.x += p.vx * 6.0; p.y += p.vy * 6.0;
         if (p.x < 0) p.x = 0; if (p.x > MAP_SIZE) p.x = MAP_SIZE;
         if (p.y < 0) p.y = 0; if (p.y > MAP_SIZE) p.y = MAP_SIZE;
 
         const currentGridX = Math.floor(p.x / CELL_SIZE);
         const currentGridY = Math.floor(p.y / CELL_SIZE);
-        
-        const insideOwn = hasCell(p.territory, currentGridX, currentGridY);
+        const insideOwn = p.territory.some(t => t.x === currentGridX && t.y === currentGridY);
 
         if (!insideOwn) {
             if (p.vx !== 0 || p.vy !== 0) {
@@ -141,13 +108,12 @@ setInterval(() => {
                 }
             }
         } else if (p.trail.length > 0) {
-            // Trigger the absolute boundary fill calculation
             p.territory = fillCapturedTerritory(p.territory, p.trail);
             p.trail = [];
         }
     });
 
-    // Handle Trail Collisions safely
+    // Collision Check Loop with Land Acquisition Stealing Logic
     Object.keys(players).forEach(idA => {
         const pA = players[idA];
         if (!pA.alive) return;
@@ -160,6 +126,12 @@ setInterval(() => {
                 if (idA === idB && index > pB.trail.length - 5) return;
                 if (Math.hypot(pA.x - tPoint.x, pA.y - tPoint.y) < 14) {
                     pB.alive = false;
+                    // KILLER STEALS ALL LAND BLOCKS INSTANTLY
+                    let stolenCells = pB.territory || [];
+                    let killerMap = new Map();
+                    pA.territory.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
+                    stolenCells.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
+                    pA.territory = Array.from(killerMap.values());
                 }
             });
         });
@@ -170,15 +142,18 @@ setInterval(() => {
         p.score = p.alive ? p.territory.length * 5 : 0;
     });
 
+    if (gameTime > 0) gameTime -= 0.05;
+
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
             client.send(JSON.stringify({
                 type: 'gameState',
-                players: Object.values(players)
+                players: Object.values(players),
+                gameTime: Math.max(0, gameTime)
             }));
         }
     });
 }, 50);
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server handling execution on ${PORT}`));
