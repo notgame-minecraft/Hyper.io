@@ -11,11 +11,18 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
+const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2); // Used for % calculation
 let players = {};
-let gameTime = 120; // 2 Minutes match timer countdown clock
+let gameTime = 120; // 2 Minutes (120 seconds)
 
-const colors = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800'];
-function getRandomColor() { return colors[Math.floor(Math.random() * colors.length)]; }
+const COLOR_POOL = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800', '#FFC107', '#009688'];
+
+function getAvailableColor() {
+    let usedColors = Object.values(players).map(p => p.color);
+    let available = COLOR_POOL.filter(c => !usedColors.includes(c));
+    if (available.length === 0) return COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
+    return available[0];
+}
 
 function generateInitialTerritory(pX, pY) {
     let blocks = [];
@@ -70,10 +77,10 @@ wss.on('connection', (ws) => {
                     id: playerId,
                     name: data.name ? data.name.substring(0, 12) : 'Guest',
                     x: sX, y: sY, vx: 0, vy: 0,
-                    color: getRandomColor(),
+                    color: getAvailableColor(), // Distinct color verification
                     trail: [],
                     territory: generateInitialTerritory(sX, sY),
-                    alive: true, score: 100
+                    alive: true, score: 0
                 };
                 ws.send(JSON.stringify({ type: 'init', playerId, gameWidth: MAP_SIZE, gameHeight: MAP_SIZE }));
             }
@@ -87,17 +94,24 @@ wss.on('connection', (ws) => {
     ws.on('close', () => { delete players[playerId]; });
 });
 
+// Accurate server-side state ticking interval loop
 setInterval(() => {
+    if (gameTime > 0) {
+        gameTime -= 0.05;
+    }
+
     Object.keys(players).forEach(id => {
         const p = players[id];
         if (!p.alive) return;
 
-        p.x += p.vx * 6.0; p.y += p.vy * 6.0;
+        p.x += p.vx * 5.5; p.y += p.vy * 5.5;
         if (p.x < 0) p.x = 0; if (p.x > MAP_SIZE) p.x = MAP_SIZE;
         if (p.y < 0) p.y = 0; if (p.y > MAP_SIZE) p.y = MAP_SIZE;
 
         const currentGridX = Math.floor(p.x / CELL_SIZE);
         const currentGridY = Math.floor(p.y / CELL_SIZE);
+        
+        // CRITICAL FIX: Verify the tiles strictly belong to YOUR territory array
         const insideOwn = p.territory.some(t => t.x === currentGridX && t.y === currentGridY);
 
         if (!insideOwn) {
@@ -110,10 +124,18 @@ setInterval(() => {
         } else if (p.trail.length > 0) {
             p.territory = fillCapturedTerritory(p.territory, p.trail);
             p.trail = [];
+            
+            // Clean up captured overlapping blocks from other players
+            Object.keys(players).forEach(otherId => {
+                if (otherId === id) return;
+                players[otherId].territory = players[otherId].territory.filter(cell => {
+                    return !p.territory.some(t => t.x === cell.x && t.y === cell.y);
+                });
+            });
         }
     });
 
-    // Collision Check Loop with Land Acquisition Stealing Logic
+    // Trail slicing collision loop
     Object.keys(players).forEach(idA => {
         const pA = players[idA];
         if (!pA.alive) return;
@@ -126,23 +148,24 @@ setInterval(() => {
                 if (idA === idB && index > pB.trail.length - 5) return;
                 if (Math.hypot(pA.x - tPoint.x, pA.y - tPoint.y) < 14) {
                     pB.alive = false;
-                    // KILLER STEALS ALL LAND BLOCKS INSTANTLY
-                    let stolenCells = pB.territory || [];
+                    
+                    // Killer steals everything instantly
                     let killerMap = new Map();
                     pA.territory.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
-                    stolenCells.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
+                    pB.territory.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
                     pA.territory = Array.from(killerMap.values());
+                    pB.territory = [];
                 }
             });
         });
     });
 
+    // Calculate score using modern layout board coverage ratio percent
     Object.keys(players).forEach(id => {
         const p = players[id];
-        p.score = p.alive ? p.territory.length * 5 : 0;
+        let calculatedPercentage = (p.territory.length / TOTAL_CELLS) * 100;
+        p.score = p.alive ? calculatedPercentage.toFixed(2) : "0.00";
     });
-
-    if (gameTime > 0) gameTime -= 0.05;
 
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
@@ -156,4 +179,4 @@ setInterval(() => {
 }, 50);
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Server handling execution on ${PORT}`));
+server.listen(PORT, () => console.log(`Active core running on port ${PORT}`));
