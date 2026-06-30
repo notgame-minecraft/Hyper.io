@@ -154,48 +154,49 @@ wss.on('connection', (ws) => {
         try {
             const data = JSON.parse(message);
 
-            if (data.type === 'spawn') {
-                const discordId = data.discordId || 'guest';
+if (data.type === 'spawn') {
+    const discordId = data.discordId || 'guest';
 
-                if (!playerData[discordId]) {
-                    playerData[discordId] = {
-                        skins: [],
-                        achievements: []
-                    };
-                    savePlayerData();
-                }
+    if (!playerData[discordId]) {
+        playerData[discordId] = {
+            skins: [],
+            achievements: []
+        };
+        savePlayerData();
+    }
 
-                const userInfo = playerData[discordId];
+    const userInfo = playerData[discordId];
 
-                const sX = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
-                const sY = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
+    const sX = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
+    const sY = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
 
-                const color = assignUniqueColor(data.skin);
+    const color = assignUniqueColor(data.skin);
 
-                players[playerId] = {
-                    id: playerId,
-                    discordId,
-                    name: data.name ? data.name.substring(0, 12) : 'Guest',
-                    x: sX,
-                    y: sY,
-                    vx: 0,
-                    vy: 0,
-                    color,
-                    unlockedSkins: userInfo.skins,
-                    achievements: userInfo.achievements,
-                    trail: [],
-                    territory: generateInitialTerritory(sX, sY),
-                    alive: true,
-                    score: 0
-                };
+    players[playerId] = {
+        id: playerId,
+        discordId,
+        name: data.name ? data.name.substring(0, 12) : 'Guest',
+        x: sX,
+        y: sY,
+        vx: 0,
+        vy: 0,
+        color,
+        unlockedSkins: userInfo.skins,
+        achievements: userInfo.achievements,
+        trail: [],
+        territory: generateInitialTerritory(sX, sY),
+        alive: true,
+        score: 0
+    };
 
-                ws.send(JSON.stringify({
-                    type: 'init',
-                    playerId,
-                    gameWidth: MAP_SIZE,
-                    gameHeight: MAP_SIZE
-                }));
-            }
+    ws.send(JSON.stringify({
+        type: 'init',
+        playerId,
+        gameWidth: MAP_SIZE,
+        gameHeight: MAP_SIZE
+    }));
+}
+
 
             const player = players[playerId];
             if (!player || !player.alive) return;

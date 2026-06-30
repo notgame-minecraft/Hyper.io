@@ -1,25 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
     <title>Hyper.io Activity</title>
-    <style>
-        body { margin:0; background:#111; color:#fff; font-family:sans-serif; }
-        #achievementToast {
-            position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-            background:#2ecc71; color:#fff; padding:10px 20px; border-radius:8px;
-            box-shadow:0 4px 12px rgba(0,0,0,0.4); display:none; z-index:9999;
-        }
-    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.0.0/dist/embedded-app-sdk.umd.min.js"></script>
+    <script src="activity-game.js"></script>
 </head>
 <body>
-    <div id="achievementToast"></div>
-    <canvas id="gameCanvas"></canvas>
-
-    <!-- Discord Activity SDK -->
-    <script src="https://discord.com/sdk/activities"></script>
-
-    <!-- Activity client -->
-    <script src="activity-game.js"></script>
+    <h1>Hyper.io Activity</h1>
+    <button id="start">Start Game</button>
 </body>
 </html>
