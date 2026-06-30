@@ -11,17 +11,17 @@
         #playButton { padding: 12px 30px; font-size: 18px; background: #00bcd4; border: none; color: #fff; border-radius: 20px; cursor: pointer; font-weight: bold; }
         
         #gameContainer { display: none; width: 100%; height: 100%; position: relative; }
-        #gameCanvas { background: #eee; display: block; }
+        #gameCanvas { background: #eee; display: block; width: 100%; height: 100%; }
         
         /* LEFT ALIGNED LEADERBOARD HUD */
-        #uiLayer { position: absolute; top: 20px; left: 20px; width: 250px; background: rgba(0,0,0,0.75); padding: 15px; border-radius: 10px; pointer-events: none; }
+        #uiLayer { position: absolute; top: 20px; left: 20px; width: 250px; background: rgba(0,0,0,0.75); padding: 15px; border-radius: 10px; pointer-events: none; z-index: 5; }
         #leaderboard h3 { margin: 0 0 10px 0; color: #00bcd4; font-size: 16px; text-transform: uppercase; }
         .player-info { display: flex; align-items: center; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
         .player-color-badge { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; display: inline-block; border: 1px solid #fff; }
         .player-info.you { font-weight: bold; color: #fff; border-left: 3px solid #00bcd4; padding-left: 5px; }
         
         /* CENTER TOP LARGE TIMER */
-        #timerHUD { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 38px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.8); padding: 8px 25px; border-radius: 30px; border: 2px solid #00bcd4; letter-spacing: 1px; pointer-events: none; text-shadow: 0 0 10px rgba(0,188,212,0.4); }
+        #timerHUD { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 38px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.8); padding: 8px 25px; border-radius: 30px; border: 2px solid #00bcd4; letter-spacing: 1px; pointer-events: none; text-shadow: 0 0 10px rgba(0,188,212,0.4); z-index: 5; }
 
         #gameOverScreen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
         #gameOverScreen h2 { font-size: 45px; color: #ff3b30; margin-bottom: 10px; }
@@ -30,7 +30,6 @@
         .respawn-btn { background: #4caf50; color: #fff; }
         .mainmenu-btn { background: #555; color: #fff; }
     </style>
-    <script src="https://gamedistribution.com/html5-sdk/js"></script>
 </head>
 <body>
 
@@ -53,10 +52,8 @@
         
         <!-- TOP MIDDLE TIMER -->
         <div id="timerHUD">2:00</div>
-        <!-- Add a version query string to bypass Discord's iframe cache -->
-    <script src="game.js?v=1.0.1"></script>
-</body>
-</html>
+        
+        <!-- GAME OVER OVERLAY (Correctly nested inside container) -->
         <div id="gameOverScreen">
             <h2>Game Over</h2>
             <p id="finalScore">0.00%</p>
@@ -65,6 +62,7 @@
         </div>
     </div>
 
-    <script src="game.js"></script>
+    <!-- Added a brand new version query string to clear Discord cache errors completely -->
+    <script src="game.js?v=1.0.3"></script>
 </body>
 </html>
