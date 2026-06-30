@@ -1,22 +1,21 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Hyper.io Web</title>
-    <script src="/game.js"></script>
+    <meta charset="UTF-8">
+    <title>Hyper.io</title>
+    <style>
+        body { margin: 0; background: #1a1a1a; color: white; font-family: sans-serif; text-align: center; }
+        canvas { display: block; margin: auto; background: #000; cursor: crosshair; }
+        #ui { position: absolute; top: 20px; width: 100%; pointer-events: none; }
+    </style>
 </head>
 <body>
-    <h1>Hyper.io Web</h1>
-
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const discordId = params.get("discordId");
-        const username = params.get("username");
-
-        if (!discordId) {
-            window.location.href = "/auth/discord";
-        } else {
-            document.body.innerHTML += `<p>Logged in as ${username}</p>`;
-        }
-    </script>
+    <div id="ui">
+        <h1>Hyper.io</h1>
+        <button onclick="window.location.href='/auth/discord'" style="pointer-events: auto;">Login with Discord</button>
+        <div id="score">Score: 0%</div>
+    </div>
+    <canvas id="gameCanvas" width="1400" height="1400"></canvas>
+    <script src="game.js"></script>
 </body>
 </html>
