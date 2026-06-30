@@ -1,8 +1,15 @@
 <!DOCTYPE html>
 <html>
-<head><title>Hyper.io</title></head>
-<body style="margin:0; background:#000;">
-    <canvas id="gameCanvas" width="1400" height="1400"></canvas>
+<head>
+    <title>Hyper.io</title>
+    <style>
+        body { margin: 0; background: #000; color: white; overflow: hidden; }
+        #score { position: absolute; top: 10px; left: 10px; font-size: 20px; }
+    </style>
+</head>
+<body>
+    <div id="score">Score: 0%</div>
+    <canvas id="gameCanvas"></canvas>
     <script src="game.js"></script>
 </body>
 </html>

@@ -1,28 +1,26 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
+const scoreEl = document.getElementById('score');
 const socket = new WebSocket(`wss://${window.location.host}`);
 
-let players = [];
-socket.onmessage = (event) => {
-    players = JSON.parse(event.data).players;
-    draw();
-};
+canvas.width = 1400; canvas.height = 1400;
 
-window.addEventListener('keydown', (e) => {
-    let vx = 0, vy = 0;
-    if (e.key === 'ArrowUp') vy = -1;
-    else if (e.key === 'ArrowDown') vy = 1;
-    else if (e.key === 'ArrowLeft') vx = -1;
-    else if (e.key === 'ArrowRight') vx = 1;
-    socket.send(JSON.stringify({ type: 'move', vx, vy }));
+let player = { x: 700, y: 700 };
+
+window.addEventListener('mousemove', (e) => {
+    player.x = e.clientX;
+    player.y = e.clientY;
+    socket.send(JSON.stringify({ type: 'move', x: player.x, y: player.y }));
 });
 
-function draw() {
+socket.onmessage = (e) => {
+    const { players } = JSON.parse(e.data);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     players.forEach(p => {
         ctx.fillStyle = p.color;
         p.territory.forEach(t => ctx.fillRect(t.x * 16, t.y * 16, 16, 16));
         ctx.fillStyle = 'white';
-        ctx.fillRect(p.x, p.y, 16, 16);
+        ctx.fillRect(p.x, p.y, 10, 10);
+        if (p.id === socket.id) scoreEl.innerText = `Score: ${p.score}%`;
     });
-}
+};
