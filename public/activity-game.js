@@ -1,17 +1,15 @@
-const appId = "YOUR_DISCORD_APP_ID"; // same as your OAuth client ID
+const appId = "1521223781362827395"; // replace this
 
 const discordSdk = new DiscordSDK(appId);
 
 async function initActivity() {
     await discordSdk.ready();
 
-    // Ask Discord for identity
     const { user } = await discordSdk.authorize();
     const { access_token } = await discordSdk.authenticate();
 
     console.log("Discord Activity User:", user);
 
-    // Connect to your game server
     const ws = new WebSocket("wss://hyper-io-tu3t.onrender.com");
 
     ws.onopen = () => {
