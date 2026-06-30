@@ -11,7 +11,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // REPLACE THESE credentials inside your Discord Developer Portal!
 const DISCORD_CLIENT_ID = '1521223781362827395';
-const DISCORD_CLIENT_SECRET = 'YOUR_DISCORD_SECRET_HERE';
+const DISCORD_CLIENT_SECRET = '9yF8iMTLhWK5mosZJyYvhcHeeZR_H7us';
 const DISCORD_REDIRECT_URI = 'https://urban-chainsaw-q76vpq49qjvpf4rp5-10000.app.github.dev/auth/discord/callback';
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
