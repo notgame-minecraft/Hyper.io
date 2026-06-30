@@ -2,7 +2,6 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
-const fetch = require('node-fetch'); // <-- DELETE THIS LINE COMPLETELY // Handles Discord profile fetching queries
 
 const app = express();
 const server = http.createServer(app);
