@@ -18,6 +18,7 @@ let players = [];
 let mouseX = 0; let mouseY = 0;
 let ws = null; let connected = false;
 let isDead = false;
+let currentTimerValue = 120;
 
 playButton.addEventListener('click', enterGameArena);
 respawnBtn.addEventListener('click', respawnPlayer);
@@ -43,18 +44,16 @@ function connectServer() {
             } else if (data.type === 'gameState') {
                 players = data.players || [];
                 
-                // Formatted countdown updates
                 if (data.gameTime !== undefined) {
-                    let mins = Math.floor(data.gameTime / 60);
-                    let secs = Math.floor(data.gameTime % 60);
-                    timerHUD.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+                    currentTimerValue = data.gameTime;
+                    updateTimerDisplay();
                 }
                 
                 if (!playerId) return;
                 const me = players.find(p => p.id === playerId);
                 if (me && !me.alive && !isDead) {
                     isDead = true;
-                    finalScore.textContent = `Your Score: ${me.score} pts`;
+                    finalScore.textContent = `${me.score}% Coverage`;
                     gameOverScreen.style.display = 'flex';
                 }
                 updateLeaderboardHUD();
@@ -63,6 +62,20 @@ function connectServer() {
     };
     ws.onclose = () => { connected = false; ws = null; playerId = null; };
 }
+
+function updateTimerDisplay() {
+    let mins = Math.floor(currentTimerValue / 60);
+    let secs = Math.floor(currentTimerValue % 60);
+    timerHUD.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+}
+
+// Fixed direct backup loop ensures Discord drops timer seamlessly even under network frame drops
+setInterval(() => {
+    if (connected && currentTimerValue > 0 && !isDead) {
+        currentTimerValue = Math.max(0, currentTimerValue - 1);
+        updateTimerDisplay();
+    }
+}, 1000);
 
 function enterGameArena() {
     playerName = nameInput.value.trim() || `Paper${Math.floor(Math.random()*900)}`;
@@ -120,14 +133,14 @@ function sendMovementVector() {
 
 function updateLeaderboardHUD() {
     if (players.length === 0) return;
-    const sorted = [...players].sort((a,b)=>b.score-a.score).slice(0,5);
+    const sorted = [...players].sort((a,b)=>parseFloat(b.score)-parseFloat(a.score)).slice(0,5);
     playersList.innerHTML = sorted.map((p, i) => `
         <div class="player-info ${p.id === playerId ? 'you' : ''}">
             <span style="display:flex; align-items:center;">
                 <span class="player-color-badge" style="background:${p.color};"></span>
                 ${i+1}. ${p.name}
             </span>
-            <span>${p.score}</span>
+            <span>${p.score}%</span>
         </div>
     `).join('');
 }
@@ -153,7 +166,6 @@ function drawGameFrame() {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, gameWidth, gameHeight);
 
-    // Grid lines
     ctx.strokeStyle = '#f1f2f6';
     ctx.lineWidth = 1;
     for (let x = 0; x < gameWidth; x += 40) {
@@ -163,7 +175,7 @@ function drawGameFrame() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(gameWidth, y); ctx.stroke();
     }
 
-    // Territories
+    // Map Territories
     players.forEach(p => {
         if (!p.territory) return;
         ctx.fillStyle = p.color;
@@ -172,7 +184,7 @@ function drawGameFrame() {
         });
     });
 
-    // Trails
+    // Trail lines
     players.forEach(p => {
         if (!p.trail || p.trail.length < 1) return;
         ctx.strokeStyle = p.color;
@@ -187,7 +199,7 @@ function drawGameFrame() {
         ctx.globalAlpha = 1.0;
     });
 
-    // Heads
+    // Player Heads
     players.forEach(p => {
         if (!p.alive) return;
         ctx.fillStyle = p.color;
