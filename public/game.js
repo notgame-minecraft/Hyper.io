@@ -31,6 +31,11 @@ let ws = null; let connected = false;
 let isDead = false;
 let currentTimerValue = 120;
 
+// Read Discord login info from URL
+const urlParams = new URLSearchParams(window.location.search);
+const loggedUsername = urlParams.get('username');
+const loggedDiscordId = urlParams.get('id');
+
 // List of available customizable skins
 const PALETTE_OPTIONS = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800'];
 let chosenSkinColor = PALETTE_OPTIONS[0];
@@ -48,11 +53,9 @@ discordLoginBtn.addEventListener('click', () => {
 
 // Check if player returned from a successful Discord Authorization redirect
 function checkUserLoginSession() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const username = urlParams.get('username');
-    if (username) {
-        nameInput.value = username;
-        userGreeting.textContent = `Logged in as: ${username}`;
+    if (loggedUsername) {
+        nameInput.value = loggedUsername;
+        userGreeting.textContent = `Logged in as: ${loggedUsername}`;
         userGreeting.style.display = 'block';
         discordLoginBtn.style.display = 'none';
     }
@@ -123,6 +126,13 @@ function updateTimerDisplay() {
 }
 
 setInterval(() => {
+        // END GAME WHEN TIMER HITS ZERO
+    if (gameTime <= 0) {
+    Object.keys(players).forEach(id => {
+        players[id].alive = false;
+    });
+    }
+
     if (connected && currentTimerValue > 0 && !isDead) {
         currentTimerValue = Math.max(0, currentTimerValue - 1);
         updateTimerDisplay();
@@ -139,7 +149,12 @@ function enterGameArena() {
 
 function sendSpawnIntent() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'spawn', name: playerName, skin: chosenSkinColor }));
+        ws.send(JSON.stringify({
+            type: 'spawn',
+            name: playerName,
+            skin: chosenSkinColor,
+            discordId: loggedDiscordId || 'guest'
+        }));
     }
 }
 
