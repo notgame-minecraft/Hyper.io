@@ -7,10 +7,10 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-// Serve static elements correctly up front
+// 1. Serve static elements correctly up front
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Cleanly synchronized credentials
+// 2. Cleanly synchronized credentials
 const DISCORD_CLIENT_ID = '1521223781362827395';
 const DISCORD_CLIENT_SECRET = '9yF8iMTLhWK5mosZJyYvhcHeeZR_H7us';
 const DISCORD_REDIRECT_URI = 'https://urban-chainsaw-q76vpq49qjvpf4rp5-10000.app.github.dev/auth/discord/callback';
@@ -22,13 +22,14 @@ let players = {};
 let gameTime = 120;
 
 const COLOR_POOL = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800', '#FFC107', '#009688'];
-// OAuth Route Redirection
+
+// 3. OAuth Route Redirection
 app.get('/auth/discord', (req, res) => {
     const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
     res.redirect(url);
 });
 
-// OAuth Callback Receiver Endpoint
+// 4. OAuth Callback Receiver Endpoint
 app.get('/auth/discord/callback', async (req, res) => {
     const code = req.query.code;
     if (!code) return res.redirect('/');
