@@ -1,107 +1,22 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hyper.io</title>
-    <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #111; font-family: sans-serif; overflow: hidden; color: #fff; }
-        #nameScreen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f171e; gap: 12px; }
-        #nameInput { padding: 12px; font-size: 18px; border-radius: 20px; border: 2px solid #00bcd4; background: #000; color: #fff; text-align: center; width: 220px; }
-        
-        .menu-row { display: flex; gap: 10px; }
-        .action-btn { padding: 12px 24px; font-size: 15px; background: #1e272e; border: 2px solid #57606f; color: #fff; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        .action-btn:hover { border-color: #00bcd4; background: #2f3542; }
-        #playButton { padding: 14px 40px; font-size: 18px; background: #00bcd4; border: none; color: #fff; border-radius: 20px; cursor: pointer; font-weight: bold; }
-        #discordLoginBtn { background: #5865F2; border: none; font-size: 15px; }
-        #discordLoginBtn:hover { background: #4752C4; }
-
-        #gameContainer { display: none; width: 100%; height: 100%; position: relative; }
-        #gameCanvas { background: #eee; display: block; width: 100%; height: 100%; }
-        
-        /* POPUP MODAL OVERLAYS */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 20; justify-content: center; align-items: center; }
-        .modal-content { background: #1e272e; padding: 30px; border-radius: 15px; border: 2px solid #00bcd4; width: 350px; text-align: center; }
-        .modal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
-        .skin-block { height: 60px; border-radius: 10px; border: 3px solid transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        .skin-block.selected { border-color: #fff; box-shadow: 0 0 10px #00bcd4; }
-        .close-btn { margin-top: 15px; padding: 8px 20px; background: #ff3b30; color: white; border: none; border-radius: 15px; cursor: pointer; }
-
-        /* LEFT ALIGNED LEADERBOARD HUD */
-        #uiLayer { position: absolute; top: 20px; left: 20px; width: 250px; background: rgba(0,0,0,0.75); padding: 15px; border-radius: 10px; pointer-events: none; z-index: 5; }
-        #leaderboard h3 { margin: 0 0 10px 0; color: #00bcd4; font-size: 16px; text-transform: uppercase; }
-        .player-info { display: flex; align-items: center; justify-content: space-between; font-size: 14px; margin-bottom: 8px; }
-        .player-color-badge { width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; display: inline-block; border: 1px solid #fff; }
-        .player-info.you { font-weight: bold; color: #fff; border-left: 3px solid #00bcd4; padding-left: 5px; }
-        
-        /* CENTER TOP LARGE TIMER */
-        #timerHUD { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 38px; font-weight: bold; color: #fff; background: rgba(0,0,0,0.8); padding: 8px 25px; border-radius: 30px; border: 2px solid #00bcd4; letter-spacing: 1px; pointer-events: none; text-shadow: 0 0 10px rgba(0,188,212,0.4); z-index: 5; }
-
-        #gameOverScreen { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); flex-direction: column; align-items: center; justify-content: center; z-index: 10; }
-        #gameOverScreen h2 { font-size: 45px; color: #ff3b30; margin-bottom: 10px; }
-        #finalScore { font-size: 20px; margin-bottom: 20px; font-weight: bold; }
-        .menu-btn { padding: 12px 35px; font-size: 16px; font-weight: bold; border-radius: 25px; cursor: pointer; margin: 10px; width: 200px; border: none; }
-        .respawn-btn { background: #4caf50; color: #fff; }
-        .mainmenu-btn { background: #555; color: #fff; }
-    </style>
+    <title>Hyper.io Web</title>
+    <script src="/game.js"></script>
 </head>
 <body>
+    <h1>Hyper.io Web</h1>
 
-    <!-- MAIN MENU LAYER -->
-    <div id="nameScreen">
-        <h1>Hyper.io</h1>
-        <button class="action-btn" id="discordLoginBtn">🔗 Login with Discord</button>
-        <span id="userGreeting" style="font-size:14px; color:#a4b0be; display:none;"></span>
-        <input type="text" id="nameInput" placeholder="Enter Nickname" maxlength="14">
-        
-        <div class="menu-row">
-            <button class="action-btn" id="openSkinsBtn">🎨 Skins</button>
-            <button class="action-btn" id="openBadgesBtn">🏆 Achievements</button>
-        </div>
-        
-        <button id="playButton">Enter Arena</button>
-    </div>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const discordId = params.get("discordId");
+        const username = params.get("username");
 
-    <!-- SKINS MODAL WINDOW -->
-    <div class="modal" id="skinsModal">
-        <div class="modal-content">
-            <h3>Select Arena Palette</h3>
-            <div class="modal-grid" id="skinsContainer"></div>
-            <button class="close-btn" id="closeSkinsBtn">Save Selection</button>
-        </div>
-    </div>
-
-    <!-- ACHIEVEMENTS MODAL WINDOW -->
-    <div class="modal" id="badgesModal">
-        <div class="modal-content">
-            <h3>Your Achievements</h3>
-            <div id="achievementsList" style="text-align:left; margin:15px 0; font-size:14px; line-height:2em;">
-                <div>🟢 <b>First Flight:</b> Join an arena match</div>
-                <div>🟠 <b>Conqueror:</b> Secure > 5% map grid coverage</div>
-                <div>🔴 <b>Dominator:</b> Take down another player</div>
-            </div>
-            <button class="close-btn" id="closeBadgesBtn">Close</button>
-        </div>
-    </div>
-
-    <!-- ARENA MATCH AREA -->
-    <div id="gameContainer">
-        <canvas id="gameCanvas"></canvas>
-        <div id="uiLayer">
-            <div id="leaderboard">
-                <h3>Arena Standings</h3>
-                <div id="playersList"></div>
-            </div>
-        </div>
-        <div id="timerHUD">2:00</div>
-        <div id="gameOverScreen">
-            <h2>Game Over</h2>
-            <p id="finalScore">0.00%</p>
-            <button class="menu-btn respawn-btn" id="respawnBtn">Respawn</button>
-            <button class="menu-btn mainmenu-btn" id="mainMenuBtn">Main Menu</button>
-        </div>
-    </div>
-
-    <script src="game.js?v=1.0.4"></script>
+        if (!discordId) {
+            window.location.href = "/auth/discord";
+        } else {
+            document.body.innerHTML += `<p>Logged in as ${username}</p>`;
+        }
+    </script>
 </body>
 </html>

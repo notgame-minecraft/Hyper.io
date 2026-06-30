@@ -1,4 +1,4 @@
-const appId = "1521223781362827395"; // replace this
+const appId = "1521223781362827395"; // SAME as OAuth client ID
 
 const discordSdk = new DiscordSDK(appId);
 
@@ -16,14 +16,12 @@ async function initActivity() {
         ws.send(JSON.stringify({
             type: "spawn",
             discordId: user.id,
-            name: user.username,
-            skin: null
+            name: user.username
         }));
     };
 
     ws.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        console.log("Game:", data);
+        console.log("Game:", JSON.parse(msg.data));
     };
 }
 
