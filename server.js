@@ -13,7 +13,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Cleanly synchronized credentials
 const DISCORD_CLIENT_ID = '1521223781362827395';
 const DISCORD_CLIENT_SECRET = '9yF8iMTLhWK5mosZJyYvhcHeeZR_H7us';
-const DISCORD_REDIRECT_URI = 'https://urban-chainsaw-q76vpq49qjvpf4rp5-10000.app.github.dev/auth/discord/callback';
+const DISCORD_REDIRECT_URI = 'https://hyper-io-tu3t.onrender.com/auth/discord/callback';
 
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
