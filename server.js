@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const fetch = require('node-fetch'); // Handles Discord profile fetching queries
 
 const app = express();
 const server = http.createServer(app);
@@ -9,32 +10,65 @@ const wss = new WebSocket.Server({ server });
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// REPLACE THESE credentials inside your Discord Developer Portal!
+const DISCORD_CLIENT_ID = '1521223781362827395';
+const DISCORD_CLIENT_SECRET = 'YOUR_DISCORD_SECRET_HERE';
+const DISCORD_REDIRECT_URI = 'https://animated-fortnight-x56j5vpx4q42qqw.github.dev/auth/discord/callback';
+
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
-const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2); // Used for % calculation
+const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2);
 let players = {};
-let gameTime = 120; // 2 Minutes (120 seconds)
+let gameTime = 120;
 
 const COLOR_POOL = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800', '#FFC107', '#009688'];
 
-function getAvailableColor() {
-    let usedColors = Object.values(players).map(p => p.color);
-    let available = COLOR_POOL.filter(c => !usedColors.includes(c));
-    if (available.length === 0) return COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
-    return available[0];
-}
+// OAuth Route Redirection
+app.get('/auth/discord', (req, res) => {
+    const url = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+    res.redirect(url);
+});
+
+// OAuth Callback Receiver Endpoint
+app.get('/auth/discord/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.redirect('/');
+    
+    try {
+        const response = await fetch('https://discord.com/api/v10/oauth2/token', {
+            method: 'POST',
+            body: new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: DISCORD_REDIRECT_URI,
+            }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        });
+        
+        const tokens = await response.json();
+        const userRes = await fetch('https://discord.com/api/v10/users/@me', {
+            headers: { Authorization: `Bearer ${tokens.access_token}` },
+        });
+        
+        const userProfile = await userRes.json();
+        // Return to client landing field carrying authentication profile tags
+        res.redirect(`/?username=${encodeURIComponent(userProfile.username)}`);
+    } catch (e) {
+        console.error(e);
+        res.redirect('/');
+    }
+});
 
 function generateInitialTerritory(pX, pY) {
     let blocks = [];
     const baseGridX = Math.floor(pX / CELL_SIZE);
     const baseGridY = Math.floor(pY / CELL_SIZE);
     const radius = 4;
-    
     for (let x = -radius; x <= radius; x++) {
         for (let y = -radius; y <= radius; y++) {
-            if (Math.hypot(x, y) <= radius) {
-                blocks.push({ x: baseGridX + x, y: baseGridY + y });
-            }
+            if (Math.hypot(x, y) <= radius) blocks.push({ x: baseGridX + x, y: baseGridY + y });
         }
     }
     return blocks;
@@ -44,9 +78,7 @@ function fillCapturedTerritory(territory, trail) {
     let cellMap = new Map();
     territory.forEach(c => cellMap.set(`${c.x},${c.y}`, { x: c.x, y: c.y }));
     trail.forEach(t => cellMap.set(`${t.gX},${t.gY}`, { x: t.gX, y: t.gY }));
-
-    let trailX = trail.map(t => t.gX);
-    let trailY = trail.map(t => t.gY);
+    let trailX = trail.map(t => t.gX); let trailY = trail.map(t => t.gY);
     let minX = Math.min(...trailX) - 1; let maxX = Math.max(...trailX) + 1;
     let minY = Math.min(...trailY) - 1; let maxY = Math.max(...trailY) + 1;
 
@@ -57,7 +89,7 @@ function fillCapturedTerritory(territory, trail) {
                 for (let i = x; i <= maxX; i++) {
                     if (cellMap.has(`${i},${y}`)) { intersections++; break; }
                 }
-                if (intersections > 0) { cellMap.set(`${x},${y}`, { x, y }); }
+                if (intersections > 0) cellMap.set(`${x},${y}`, { x, y });
             }
         }
     }
@@ -73,11 +105,12 @@ wss.on('connection', (ws) => {
             if (data.type === 'spawn') {
                 const sX = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
                 const sY = Math.floor(Math.random() * (MAP_SIZE - 300)) + 150;
+                
                 players[playerId] = {
                     id: playerId,
                     name: data.name ? data.name.substring(0, 12) : 'Guest',
                     x: sX, y: sY, vx: 0, vy: 0,
-                    color: getAvailableColor(), // Distinct color verification
+                    color: data.skin || COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)],
                     trail: [],
                     territory: generateInitialTerritory(sX, sY),
                     alive: true, score: 0
@@ -94,11 +127,8 @@ wss.on('connection', (ws) => {
     ws.on('close', () => { delete players[playerId]; });
 });
 
-// Accurate server-side state ticking interval loop
 setInterval(() => {
-    if (gameTime > 0) {
-        gameTime -= 0.05;
-    }
+    if (gameTime > 0) gameTime -= 0.05;
 
     Object.keys(players).forEach(id => {
         const p = players[id];
@@ -110,8 +140,6 @@ setInterval(() => {
 
         const currentGridX = Math.floor(p.x / CELL_SIZE);
         const currentGridY = Math.floor(p.y / CELL_SIZE);
-        
-        // CRITICAL FIX: Verify the tiles strictly belong to YOUR territory array
         const insideOwn = p.territory.some(t => t.x === currentGridX && t.y === currentGridY);
 
         if (!insideOwn) {
@@ -124,8 +152,6 @@ setInterval(() => {
         } else if (p.trail.length > 0) {
             p.territory = fillCapturedTerritory(p.territory, p.trail);
             p.trail = [];
-            
-            // Clean up captured overlapping blocks from other players
             Object.keys(players).forEach(otherId => {
                 if (otherId === id) return;
                 players[otherId].territory = players[otherId].territory.filter(cell => {
@@ -135,21 +161,16 @@ setInterval(() => {
         }
     });
 
-    // Trail slicing collision loop
     Object.keys(players).forEach(idA => {
         const pA = players[idA];
         if (!pA.alive) return;
-
         Object.keys(players).forEach(idB => {
             const pB = players[idB];
             if (!pB.alive) return;
-
             pB.trail.forEach((tPoint, index) => {
                 if (idA === idB && index > pB.trail.length - 5) return;
                 if (Math.hypot(pA.x - tPoint.x, pA.y - tPoint.y) < 14) {
                     pB.alive = false;
-                    
-                    // Killer steals everything instantly
                     let killerMap = new Map();
                     pA.territory.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
                     pB.territory.forEach(c => killerMap.set(`${c.x},${c.y}`, c));
@@ -160,7 +181,6 @@ setInterval(() => {
         });
     });
 
-    // Calculate score using modern layout board coverage ratio percent
     Object.keys(players).forEach(id => {
         const p = players[id];
         let calculatedPercentage = (p.territory.length / TOTAL_CELLS) * 100;
@@ -169,11 +189,7 @@ setInterval(() => {
 
     wss.clients.forEach(client => {
         if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-                type: 'gameState',
-                players: Object.values(players),
-                gameTime: Math.max(0, gameTime)
-            }));
+            client.send(JSON.stringify({ type: 'gameState', players: Object.values(players), gameTime: Math.max(0, gameTime) }));
         }
     });
 }, 50);

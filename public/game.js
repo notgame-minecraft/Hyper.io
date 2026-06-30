@@ -11,6 +11,17 @@ const finalScore = document.getElementById('finalScore');
 const respawnBtn = document.getElementById('respawnBtn');
 const mainMenuBtn = document.getElementById('mainMenuBtn');
 
+// Newly Added UI Selectors
+const discordLoginBtn = document.getElementById('discordLoginBtn');
+const userGreeting = document.getElementById('userGreeting');
+const openSkinsBtn = document.getElementById('openSkinsBtn');
+const closeSkinsBtn = document.getElementById('closeSkinsBtn');
+const skinsModal = document.getElementById('skinsModal');
+const skinsContainer = document.getElementById('skinsContainer');
+const openBadgesBtn = document.getElementById('openBadgesBtn');
+const closeBadgesBtn = document.getElementById('closeBadgesBtn');
+const badgesModal = document.getElementById('badgesModal');
+
 let gameWidth = 1400; let gameHeight = 1400;
 const CELL_SIZE = 16;
 let playerId = null; let playerName = null;
@@ -19,6 +30,48 @@ let mouseX = 0; let mouseY = 0;
 let ws = null; let connected = false;
 let isDead = false;
 let currentTimerValue = 120;
+
+// List of available customizable skins
+const PALETTE_OPTIONS = ['#FF5722', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#00BCD4', '#4CAF50', '#FF9800'];
+let chosenSkinColor = PALETTE_OPTIONS[0];
+
+// Handle Modal View States
+openSkinsBtn.addEventListener('click', () => { renderSkinGrid(); skinsModal.style.display = 'flex'; });
+closeSkinsBtn.addEventListener('click', () => skinsModal.style.display = 'none');
+openBadgesBtn.addEventListener('click', () => badgesModal.style.display = 'flex');
+closeBadgesBtn.addEventListener('click', () => badgesModal.style.display = 'none');
+
+// Discord OAuth Redirection Anchor Link
+discordLoginBtn.addEventListener('click', () => {
+    window.location.href = '/auth/discord';
+});
+
+// Check if player returned from a successful Discord Authorization redirect
+function checkUserLoginSession() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const username = urlParams.get('username');
+    if (username) {
+        nameInput.value = username;
+        userGreeting.textContent = `Logged in as: ${username}`;
+        userGreeting.style.display = 'block';
+        discordLoginBtn.style.display = 'none';
+    }
+}
+checkUserLoginSession();
+
+function renderSkinGrid() {
+    skinsContainer.innerHTML = PALETTE_OPTIONS.map(color => `
+        <div class="skin-block ${chosenSkinColor === color ? 'selected' : ''}" 
+             style="background:${color};" 
+             onclick="selectSkinColor('${color}')">
+        </div>
+    `).join('');
+}
+
+window.selectSkinColor = function(color) {
+    chosenSkinColor = color;
+    renderSkinGrid();
+};
 
 playButton.addEventListener('click', enterGameArena);
 respawnBtn.addEventListener('click', respawnPlayer);
@@ -69,7 +122,6 @@ function updateTimerDisplay() {
     timerHUD.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 }
 
-// Fixed direct backup loop ensures Discord drops timer seamlessly even under network frame drops
 setInterval(() => {
     if (connected && currentTimerValue > 0 && !isDead) {
         currentTimerValue = Math.max(0, currentTimerValue - 1);
@@ -87,7 +139,7 @@ function enterGameArena() {
 
 function sendSpawnIntent() {
     if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'spawn', name: playerName }));
+        ws.send(JSON.stringify({ type: 'spawn', name: playerName, skin: chosenSkinColor }));
     }
 }
 
@@ -175,7 +227,6 @@ function drawGameFrame() {
         ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(gameWidth, y); ctx.stroke();
     }
 
-    // Map Territories
     players.forEach(p => {
         if (!p.territory) return;
         ctx.fillStyle = p.color;
@@ -184,7 +235,6 @@ function drawGameFrame() {
         });
     });
 
-    // Trail lines
     players.forEach(p => {
         if (!p.trail || p.trail.length < 1) return;
         ctx.strokeStyle = p.color;
@@ -199,7 +249,6 @@ function drawGameFrame() {
         ctx.globalAlpha = 1.0;
     });
 
-    // Player Heads
     players.forEach(p => {
         if (!p.alive) return;
         ctx.fillStyle = p.color;
