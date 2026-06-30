@@ -5,12 +5,8 @@ const socket = new WebSocket(`wss://${window.location.host}`);
 
 canvas.width = 1400; canvas.height = 1400;
 
-let player = { x: 700, y: 700 };
-
 window.addEventListener('mousemove', (e) => {
-    player.x = e.clientX;
-    player.y = e.clientY;
-    socket.send(JSON.stringify({ type: 'move', x: player.x, y: player.y }));
+    socket.send(JSON.stringify({ type: 'move', x: e.clientX, y: e.clientY }));
 });
 
 socket.onmessage = (e) => {
@@ -20,7 +16,7 @@ socket.onmessage = (e) => {
         ctx.fillStyle = p.color;
         p.territory.forEach(t => ctx.fillRect(t.x * 16, t.y * 16, 16, 16));
         ctx.fillStyle = 'white';
-        ctx.fillRect(p.x, p.y, 10, 10);
-        if (p.id === socket.id) scoreEl.innerText = `Score: ${p.score}%`;
+        ctx.fillRect(p.x, p.y, 8, 8);
+        scoreEl.innerText = `Score: ${p.score}%`;
     });
 };
