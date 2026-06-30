@@ -12,8 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // REPLACE THESE credentials inside your Discord Developer Portal!
 const DISCORD_CLIENT_ID = '1521223781362827395';
 const DISCORD_CLIENT_SECRET = 'YOUR_DISCORD_SECRET_HERE';
-const DISCORD_REDIRECT_URI = 'https://animated-fortnight-x56j5vpx4q42qqw.github.dev/auth/discord/callback';
-
+const DISCORD_REDIRECT_URI = 'https://urban-chainsaw-q76vpq49qjvpf4rp5.github.dev/auth/discord/callback';
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
 const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2);
