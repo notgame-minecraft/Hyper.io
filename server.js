@@ -3,14 +3,62 @@ const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
 const fs = require('fs');
+const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// ENV VARS (Render)
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID;
+const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
+const DISCORD_REDIRECT_URI = process.env.DISCORD_REDIRECT_URI;
+
+// ---------- OAUTH ROUTES MUST COME FIRST ----------
+
+app.get('/auth/discord', (req, res) => {
+    const redirect = `https://discord.com/api/oauth2/authorize?client_id=${DISCORD_CLIENT_ID}&redirect_uri=${encodeURIComponent(DISCORD_REDIRECT_URI)}&response_type=code&scope=identify`;
+    res.redirect(redirect);
+});
+
+app.get('/auth/discord/callback', async (req, res) => {
+    const code = req.query.code;
+    if (!code) return res.send('No code provided');
+
+    try {
+        const tokenResponse = await axios.post(
+            'https://discord.com/api/oauth2/token',
+            new URLSearchParams({
+                client_id: DISCORD_CLIENT_ID,
+                client_secret: DISCORD_CLIENT_SECRET,
+                grant_type: 'authorization_code',
+                code,
+                redirect_uri: DISCORD_REDIRECT_URI
+            }),
+            { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+
+        const accessToken = tokenResponse.data.access_token;
+
+        const userResponse = await axios.get('https://discord.com/api/users/@me', {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        const user = userResponse.data;
+
+        res.redirect(`/index.html?discordId=${user.id}&username=${encodeURIComponent(user.username)}`);
+    } catch (err) {
+        console.error(err);
+        res.send('OAuth failed');
+    }
+});
+
+// ---------- STATIC FILES AFTER OAUTH ROUTES ----------
+
 app.use(express.static(path.join(__dirname, 'public')));
 
-// GAME CONSTANTS
+// ---------- GAME STATE / WEBSOCKET ----------
+
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16;
 const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2);
@@ -23,10 +71,8 @@ const COLOR_POOL = [
     '#FFC107', '#009688'
 ];
 
-// Track which colors are in use
 let usedColors = new Set();
 
-// JSON PLAYER DATA
 let playerData = {};
 try {
     playerData = JSON.parse(fs.readFileSync('playerData.json'));
@@ -94,7 +140,6 @@ function assignUniqueColor(requestedColor) {
             return color;
         }
     }
-    // fallback: random, even if duplicate
     return COLOR_POOL[Math.floor(Math.random() * COLOR_POOL.length)];
 }
 
@@ -102,7 +147,6 @@ function freeColor(color) {
     if (usedColors.has(color)) usedColors.delete(color);
 }
 
-// WEBSOCKET CONNECTION
 wss.on('connection', (ws) => {
     const playerId = Math.random().toString(36).substr(2, 9);
 
@@ -173,11 +217,8 @@ wss.on('connection', (ws) => {
     });
 });
 
-// GAME LOOP — TIMER END + ACHIEVEMENT
 setInterval(() => {
-
     if (gameTime > 0) gameTime -= 0.05;
-
     if (gameTime <= 0) {
         Object.keys(players).forEach(id => {
             players[id].alive = false;
@@ -272,4 +313,4 @@ setInterval(() => {
 }, 50);
 
 const PORT = process.env.PORT || 10000;
-server.listen(PORT, () => console.log(`Active core running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Hyper.io running on port ${PORT}`));
