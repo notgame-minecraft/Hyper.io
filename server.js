@@ -7,12 +7,14 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
+// Serve static elements correctly up front
 app.use(express.static(path.join(__dirname, 'public')));
 
-// REPLACE THESE credentials inside your Discord Developer Portal!
+// Cleanly synchronized credentials
 const DISCORD_CLIENT_ID = '1521223781362827395';
 const DISCORD_CLIENT_SECRET = '9yF8iMTLhWK5mosZJyYvhcHeeZR_H7us';
 const DISCORD_REDIRECT_URI = 'https://urban-chainsaw-q76vpq49qjvpf4rp5-10000.app.github.dev/auth/discord/callback';
+
 const MAP_SIZE = 1400;
 const CELL_SIZE = 16; 
 const TOTAL_CELLS = Math.pow(Math.floor(MAP_SIZE / CELL_SIZE), 2);
@@ -51,7 +53,6 @@ app.get('/auth/discord/callback', async (req, res) => {
         });
         
         const userProfile = await userRes.json();
-        // Return to client landing field carrying authentication profile tags
         res.redirect(`/?username=${encodeURIComponent(userProfile.username)}`);
     } catch (e) {
         console.error(e);
