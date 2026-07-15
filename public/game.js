@@ -150,11 +150,13 @@ function connectServer() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socketUrl = "wss://hyper-io-backend.werewolfoutside.workers.dev/";
 
-    // Correctly initialize the WebSocket connection
+    // 1. Initialize the WebSocket
     ws = new WebSocket(socketUrl);
 
+    // 2. ONLY spawn after the socket is officially connected and open
     ws.onopen = () => {
         connected = true;
+        console.log("Connected to server backend!");
         sendSpawnIntent();
     };
 
@@ -190,9 +192,21 @@ function connectServer() {
                 }
                 updateLeaderboardHUD();
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { 
+            console.error("Message handling error:", e); 
+        }
     };
-    ws.onclose = () => { connected = false; ws = null; playerId = null; };
+
+    ws.onerror = (err) => {
+        console.error("WebSocket Connection Error:", err);
+    };
+
+    ws.onclose = () => { 
+        connected = false; 
+        ws = null; 
+        playerId = null; 
+        console.log("WebSocket connection closed.");
+    };
 }
 
 function updateTimerDisplay() {
@@ -326,3 +340,24 @@ function drawGameFrame() {
         ctx.moveTo(p.trail[0].x, p.trail[0].y);
         for(let i=1; i<p.trail.length; i++) { ctx.lineTo(p.trail[i].x, p.trail[i].y); }
         ctx.stroke();
+        ctx.globalAlpha = 1.0;
+    });
+
+    players.forEach(p => {
+        if (!p.alive) return;
+        ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 10, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.stroke();
+
+        ctx.fillStyle = '#2f3542';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.name, p.x, p.y - 18);
+    });
+
+    ctx.restore();
+    requestAnimationFrame(drawGameFrame);
+}
+
+setInterval(sendMovementVector, 50);
+requestAnimationFrame(drawGameFrame);
