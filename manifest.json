@@ -1,0 +1,18 @@
+{
+  "name": "Hyper.io",
+  "type": "activity",
+  "application_id": "1521223781362827395",
+  "domains": [
+    "hyper-io-tu3t.onrender.com"
+  ],
+  "activities": [
+    {
+      "name": "Hyper.io",
+      "description": "Territory control game inside Discord",
+      "type": "embedded",
+      "url": "https://hyper-io-tu3t.onrender.com/activity.html",
+      "privacy_policy_url": "https://hyper-io-tu3t.onrender.com/privacy",
+      "terms_of_service_url": "https://hyper-io-tu3t.onrender.com/terms"
+    }
+  ]
+}
